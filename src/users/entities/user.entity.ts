@@ -19,8 +19,8 @@ export class User {
   @Column({ length: 255, nullable: false })
   password_hash: string;
 
-    @OneToMany(() => Address, (address) => address.user, { cascade: true })
-    addresses: Address[];
+  @OneToMany(() => Address, (address) => address.user, { cascade: true })
+  addresses: Address[];
 
   // first_name VARCHAR(100) NOT NULL
   @Column({ length: 100, nullable: false })
