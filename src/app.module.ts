@@ -5,6 +5,20 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config/configuration';
 import { typeOrmConfig } from './config/typeorm.config';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
+import { ProductsImagesModule } from './products-images/products-images.module';
+import { ProductVariantsModule } from './product-variants/product-variants.module';
+import { CartsModule } from './carts/carts.module';
+import { CartItemsModule } from './cart-items/cart-items.module';
+import { OrdersModule } from './orders/orders.module';
+import { OrderItemsModule } from './order-items/order-items.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { CouponUsageModule } from './coupon-usage/coupon-usage.module';
+import { WishlistsModule } from './wishlists/wishlists.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -18,6 +32,20 @@ import { typeOrmConfig } from './config/typeorm.config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => (typeOrmConfig),
     }),
+    CategoriesModule,
+    ProductsModule,
+    ProductsImagesModule,
+    ProductVariantsModule,
+    CartsModule,
+    CartItemsModule,
+    OrdersModule,
+    OrderItemsModule,
+    PaymentsModule,
+    ReviewsModule,
+    CouponsModule,
+    CouponUsageModule,
+    WishlistsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

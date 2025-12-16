@@ -13,6 +13,7 @@ import { User } from '../../users/entities/user.entity';
 import { AddressType } from '../enums/adress-type.enum';
 
 @Entity('addresses')
+@Index('idx_addresses_user_id', ['user'])
 export class Address {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -25,7 +26,7 @@ export class Address {
   userId: string;
 
   @Column({length: 20, name: 'address_type' })
-  addressType: AddressType; // Utilise une enum (voir ci-dessous)
+  addressType: AddressType;
 
   @Column({name: 'is_default',default: false })
   isDefault: boolean;

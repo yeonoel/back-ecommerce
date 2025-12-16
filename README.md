@@ -1,9 +1,11 @@
 # E-commerce Backend (Draft)
+![workflow](./screenshots/e-commerce-workflow.png)
+
 
 ## 📌 Description
 
 Backend d’un site e-commerce en cours de développement.
-Ce projet fournit une API REST pour la gestion des utilisateurs, produits, panier et commandes.
+Ce projet fournit une API REST pour la gestion des utilisateurs, produits, panier et commandes etc...
 
 ⚠️ **Note** : Ceci est un README provisoire. Une version complète sera ajoutée à la fin du projet.
 
@@ -68,5 +70,3 @@ src/
 ---
 
 ## 📄 Licence
-
-Projet personnel – usage éducatif / démonstration.
