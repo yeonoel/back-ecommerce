@@ -10,7 +10,7 @@ import {
   OneToMany
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
-import { AddressType } from '../enums/adress-type.enum';
+import { AddressType } from '../enums/address-type.enum';
 
 @Entity('addresses')
 @Index('idx_addresses_user_id', ['user'])
@@ -25,7 +25,7 @@ export class Address {
   @Column({ name: 'user_id' })
   userId: string;
 
-  @Column({length: 20, name: 'address_type' })
+  @Column({name: 'address_type', type: 'enum', enum: AddressType, default: AddressType.SHIPPING })
   addressType: AddressType;
 
   @Column({name: 'is_default',default: false })
@@ -34,7 +34,7 @@ export class Address {
   @Column({name: 'street_address', type: 'varchar', length: 255,nullable: false})
   streetAddress: string;
 
-  @Column({length: 100,nullable: true })
+  @Column({length: 100, nullable: true })
   apartment: string;
 
   @Column({length: 100,nullable: false})
@@ -54,4 +54,16 @@ export class Address {
 
   @UpdateDateColumn({name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
   updatedAt: Date;
+
+  getFormattedAddress(): string {
+    const addressParts = [
+      this.streetAddress,
+      this.apartment,
+      this.city,
+      this.state,
+      this.postalCode,
+      this.country,
+    ]
+    return addressParts.filter(Boolean).join(', ');
+  }
 }
