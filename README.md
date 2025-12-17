@@ -209,4 +209,79 @@ backend/
 ---
 
 
+## 🗄️ Création de la base de données
+
+Ce projet utilise **PostgreSQL** avec **Docker Compose** pour la gestion de la base de données.
+
+---
+
+### ✅ Prérequis
+
+Avant de commencer, assurez-vous d’avoir installé :
+- **Docker**
+- **Node.js**
+- Un client PostgreSQL (psql, DBeaver, etc.)
+
+---
+
+### 🚀 Démarrage de la base de données
+
+La base de données est créée automatiquement via Docker Compose.
+
+```bash
+npm run db:start
+Cette commande :
+
+démarre le conteneur PostgreSQL
+
+crée la base de données définie dans docker-compose.yml
+
+📦 Migrations
+Les migrations permettent de créer les tables, relations et index dans la base de données.
+
+Générer une migration (si nécessaire)
+
+npm run migration:generate
+Exécuter les migrations
+
+npm run migration:run
+➡️ Les tables sont maintenant créées dans la base de données.
+
+🌱 Insertion des données de test (Seed)
+Le seeding permet de remplir automatiquement la base de données avec des données de test
+(utilisateurs, catégories, produits, variantes, paniers, etc.).
+
+Nettoyer la base de données
+
+npm run seed:clean
+Insérer les données de test
+bash
+Copy code
+npm run seed
+Méthode recommandée
+
+npm run seed:force
+➡️ Supprime toutes les données existantes puis réinsère des données propres.
+
+🔍 Vérification
+Accédez à la base de données avec :
+
+DBeaver
+
+psql
+
+tout autre client PostgreSQL
+
+Vérifiez que :
+
+les tables sont bien créées
+
+les données de test sont bien présentes
+
+⚠️ Important
+Les commandes de seed sont destinées uniquement à l’environnement de développement.
+Ne pas utiliser en production.
+
+
+
 ## 📄 Licence
