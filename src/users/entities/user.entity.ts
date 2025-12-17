@@ -1,5 +1,6 @@
 // src/users/user.entity.ts
 
+import { Exclude } from 'class-transformer';
 import { Address } from '../../addresses/entities/address.entity';
 import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 
@@ -17,34 +18,35 @@ export class User {
 
   // password_hash VARCHAR(255) NOT NULL
   @Column({ length: 255, nullable: false })
-  password_hash: string;
+  @Exclude()
+  password: string;
 
   @OneToMany(() => Address, (address) => address.user, { cascade: true })
   addresses: Address[];
 
   // first_name VARCHAR(100) NOT NULL
-  @Column({ length: 100, nullable: false })
-  first_name: string;
+  @Column({name: 'first_name', length: 100, nullable: false })
+  firstName: string;
 
   // last_name VARCHAR(100) NOT NULL
-  @Column({ length: 100, nullable: false })
-  last_name: string;
+  @Column({name: 'last_name', length: 100, nullable: false })
+  lastName: string;
 
   // phone VARCHAR(20)
   @Column({ length: 20, nullable: true })
   phone: string;
 
   // avatar_url VARCHAR(500)
-  @Column({ length: 500, nullable: true })
-  avatar_url: string;
+  @Column({ name: 'avatar_url', length: 500, nullable: true })
+  avatarUrl: string;
 
   // email_verified BOOLEAN DEFAULT FALSE
-  @Column({ default: false })
-  email_verified: boolean;
+  @Column({name: 'email_verified', default: false })
+  emailVerified: boolean;
 
   // is_active BOOLEAN DEFAULT TRUE
-  @Column({ default: true })
-  is_active: boolean;
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
 
   // role VARCHAR(20) DEFAULT 'customer'
   @Column({ length: 20, default: 'customer' })
@@ -52,14 +54,14 @@ export class User {
   role: string;
 
   // created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  @CreateDateColumn()
-  created_at: Date;
+  @CreateDateColumn({ name: 'created_at' })
+  createAt: Date;
 
   // updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  @UpdateDateColumn()
-  updated_at: Date;
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 
   // last_login_at TIMESTAMP
-  @Column({ type: 'timestamp', nullable: true })
-  last_login_at: Date;
+  @Column({name: 'last_login_at', type: 'timestamp', nullable: true })
+  lastLoginAt: Date;
 }

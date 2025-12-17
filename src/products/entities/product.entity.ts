@@ -7,7 +7,7 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, C
 @Entity('products')
 @Index('idx_products_slug', ['slug'])
 @Index('idx_products_category_id', ['category'])
-@Index('idx_products_is_active', ['is_active'])
+@Index('idx_products_is_active', ['isActive'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
