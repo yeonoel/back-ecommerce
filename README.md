@@ -247,10 +247,14 @@ Exécuter les migrations
 npm run migration:run
 ➡️ Les tables sont maintenant créées dans la base de données.
 
-🌱 Insertion des données de test (Seed)
+```
+
+
+## 🌱 Insertion des données de test (Seed)
 Le seeding permet de remplir automatiquement la base de données avec des données de test
 (utilisateurs, catégories, produits, variantes, paniers, etc.).
 
+```bash
 Nettoyer la base de données
 
 npm run seed:clean
