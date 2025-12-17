@@ -57,9 +57,6 @@ JWT_SECRET=your_secret_key
 ## 📂 Structure du projet (simplifiée)
 
 ```bash
-# 📦 E-commerce Backend – Project Structure
-
-```
 backend/
 ├─ src/
 │  ├─ main.ts
@@ -72,7 +69,7 @@ backend/
 │  │  ├─ migrations/
 │  │  │  └─ *.ts
 │  │  └─ seeds/
-│  │     ├─ seed.ts
+│  │     ├─ index.ts
 │  │     ├─ user.seed.ts
 │  │     ├─ category.seed.ts
 │  │     ├─ product.seed.ts
@@ -111,6 +108,26 @@ backend/
 │  │     ├─ product-image.entity.ts
 │  │     └─ product-variant.entity.ts
 │  │
+│  ├─ product-variants/
+│  │  ├─ product-variants.module.ts
+│  │  ├─ product-variants.controller.ts
+│  │  ├─ product-variants.service.ts
+│  │  ├─ dto/
+│  │  │  ├─ create-variant.dto.ts
+│  │  │  └─ update-variant.dto.ts
+│  │  └─ entities/
+│  │     └─ product-variant.entity.ts
+│  │
+│  ├─ products-images/
+│  │  ├─ products-images.module.ts
+│  │  ├─ products-images.controller.ts
+│  │  ├─ products-images.service.ts
+│  │  ├─ dto/
+│  │  │  ├─ create-image.dto.ts
+│  │  │  └─ update-image.dto.ts
+│  │  └─ entities/
+│  │     └─ product-image.entity.ts
+│  │
 │  ├─ carts/
 │  │  ├─ carts.module.ts
 │  │  ├─ carts.controller.ts
@@ -133,11 +150,29 @@ backend/
 │  │     ├─ order.entity.ts
 │  │     └─ order-item.entity.ts
 │  │
+│  ├─ auth/
+│  │  ├─ auth.module.ts
+│  │  ├─ auth.controller.ts
+│  │  ├─ auth.service.ts
+│  │  ├─ strategies/
+│  │  │  └─ jwt.strategy.ts
+│  │  ├─ guards/
+│  │  │  └─ jwt-auth.guard.ts
+│  │  └─ dto/
+│  │     ├─ login.dto.ts
+│  │     └─ register.dto.ts
+│  │
 │  ├─ payments/
 │  │  ├─ payments.module.ts
 │  │  ├─ payments.service.ts
 │  │  └─ entities/
 │  │     └─ payment.entity.ts
+│  │
+│  ├─ shipments/
+│  │  ├─ shipments.module.ts
+│  │  ├─ shipments.service.ts
+│  │  └─ entities/
+│  │     └─ shipment.entity.ts
 │  │
 │  ├─ coupons/
 │  │  ├─ coupons.module.ts
@@ -168,10 +203,6 @@ backend/
 ├─ tsconfig.json
 ├─ tsconfig.build.json
 └─ README.md
-```
-
-🚀 Clean, modular, production-ready NestJS e-commerce backend structure.
-
 ```
 
 ---
