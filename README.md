@@ -282,6 +282,6 @@ les données de test sont bien présentes
 Les commandes de seed sont destinées uniquement à l’environnement de développement.
 Ne pas utiliser en production.
 
-
+```
 
 ## 📄 Licence
