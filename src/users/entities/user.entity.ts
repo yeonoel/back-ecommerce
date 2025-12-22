@@ -2,7 +2,7 @@
 
 import { Exclude } from 'class-transformer';
 import { Address } from '../../addresses/entities/address.entity';
-import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { UserRole } from '../enum/userRole.enum';
 
 @Entity("users") // Nom de la table dans PostgreSQL

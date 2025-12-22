@@ -4,7 +4,7 @@ import { Cart } from '../../carts/entities/cart.entity';
 import { ProductVariant } from '../../product-variants/entities/product-variant.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Category } from '../../categories/entities/category.entity';
-import { User } from '../../auth/entities/user.entity';
+import { User } from 'src/users/entities/user.entity';
 
 export async function cleanDatabase(ds: DataSource) {
   // Désactiver les contraintes FK

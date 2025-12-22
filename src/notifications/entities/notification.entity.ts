@@ -1,3 +1,4 @@
+import { User } from '../../users/entities/user.entity';
 import {
   Entity,
   Column,
@@ -7,7 +8,6 @@ import {
   Index,
   CreateDateColumn,
 } from 'typeorm';
-import { User } from '../../auth/entities/user.entity';
 
 @Entity('notifications')
 @Index('idx_notifications_user_id', ['user'])

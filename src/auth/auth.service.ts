@@ -1,17 +1,16 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RegisterDto } from './dto/Register.dto';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from './enum/userRole.enum';
+import { UserRole } from '../users/enum/userRole.enum';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersResponseDto } from './dto/Users-response';
-import { AUTH_CONSTANTS } from '../common/constants/auth.constants';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
-export class UsersService {
+export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,

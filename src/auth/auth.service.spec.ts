@@ -1,20 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './auth.service';
+import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { Auth, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RegisterDto } from './dto/Register.dto';
 import { ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from './enum/userRole.enum';
+import { UserRole } from '../users/enum/userRole.enum';
+import { User } from '../../src/users/entities/user.entity';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 describe('AuthService', () => {
-  let service: UsersService;
+  let service: AuthService;
   let userRepository: Repository<User>;
   let jwtService: JwtService;
   let configService: ConfigService;
@@ -37,7 +37,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UsersService,
+        AuthService,
         {
           provide: getRepositoryToken(User),
           useClass: Repository
@@ -58,7 +58,7 @@ describe('AuthService', () => {
       ],
     }).compile();
 
-    service = module.get<UsersService>(UsersService);
+    service = module.get<AuthService>(AuthService);
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
     jwtService = module.get<JwtService>(JwtService);
     configService = module.get<ConfigService>(ConfigService);

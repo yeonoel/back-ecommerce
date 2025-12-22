@@ -20,7 +20,7 @@ import { CouponUsageModule } from './coupon-usage/coupon-usage.module';
 import { WishlistsModule } from './wishlists/wishlists.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
-
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -49,8 +49,7 @@ import { AuthModule } from './auth/auth.module';
     CouponUsageModule,
     WishlistsModule,
     NotificationsModule,
-    AuthModule,
-    
+    UsersModule,    
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,7 +1,7 @@
 // users.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from './auth.controller';
-import { UsersService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
 import { HttpStatus } from '@nestjs/common';
 
 // Import depuis vos fichiers séparés
@@ -12,8 +12,8 @@ import {
 import { createMockUsersService} from './mocks/user.service.mock';
 
 describe('AuthController', () => {
-  let controller: UsersController;
-  let service: UsersService;
+  let controller: AuthController;
+  let service: AuthService;
   let mockUsersService;
 
   beforeEach(async () => {
@@ -22,17 +22,17 @@ describe('AuthController', () => {
     mockUsersService = createMockUsersService();
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
+      controllers: [AuthController],
       providers: [
         {
-          provide: UsersService,
+          provide: AuthService,
           useValue: mockUsersService
         }
       ],
     }).compile();
 
-    controller = module.get<UsersController>(UsersController);
-    service = module.get<UsersService>(UsersService);
+    controller = module.get<AuthController>(AuthController);
+    service = module.get<AuthService>(AuthService);
   });
 
   afterEach(() => {
