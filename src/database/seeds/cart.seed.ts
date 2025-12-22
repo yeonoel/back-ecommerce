@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Cart } from '../../carts/entities/cart.entity';
-import { User } from '../../users/entities/user.entity';
-import { UserRole } from '../../users/enum/userRole.enum';
+import { User } from '../../auth/entities/user.entity';
+import { UserRole } from '../../auth/enum/userRole.enum';
 
 export async function seedCarts(ds: DataSource) {
   console.log('seedCarts loaded');

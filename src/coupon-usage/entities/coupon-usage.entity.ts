@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn } from 'typeorm';
 import { Coupon } from '../../coupons/entities/coupon.entity';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../auth/entities/user.entity';
 import { Order } from '../../orders/entities/order.entity';
 
 @Entity('coupon_usage')

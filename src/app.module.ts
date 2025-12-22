@@ -19,7 +19,8 @@ import { CouponsModule } from './coupons/coupons.module';
 import { CouponUsageModule } from './coupon-usage/coupon-usage.module';
 import { WishlistsModule } from './wishlists/wishlists.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { UsersModule } from './users/users.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => (typeOrmConfig),
     }),
-    UsersModule,
+    AuthModule,
     CategoriesModule,
     ProductsModule,
     ProductsImagesModule,
@@ -48,6 +49,7 @@ import { UsersModule } from './users/users.module';
     CouponUsageModule,
     WishlistsModule,
     NotificationsModule,
+    AuthModule,
     
   ],
   controllers: [AppController],

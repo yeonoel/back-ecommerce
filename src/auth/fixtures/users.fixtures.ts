@@ -1,7 +1,7 @@
 // test/fixtures/users.fixtures.ts
 
 import { UsersResponseDto } from "../dto/Users-response";
-import { CreateUserDto } from "../dto/Create-user.dto";
+import { RegisterDto } from "../dto/Register.dto";
 
 export const buildUserDto = () => ({
   email: `test${Date.now()}${Math.random()}@example.com`,
@@ -12,7 +12,7 @@ export const buildUserDto = () => ({
 
 
 
-export const mockCreateUserDto: CreateUserDto = {
+export const mockCreateUserDto: RegisterDto = {
   email: 'test@example.com',
   password: 'password123',
   firstName: 'John',
@@ -21,7 +21,7 @@ export const mockCreateUserDto: CreateUserDto = {
   avatarUrl: undefined
 };
 
-export const mockCreateUserDtoWithOptional: CreateUserDto = {
+export const mockCreateUserDtoWithOptional: RegisterDto = {
   email: 'test2@example.com',
   password: 'password456',
   firstName: 'Jane',
@@ -53,7 +53,7 @@ export const mockAuthResponseWithOptional: UsersResponseDto = {
 };
 
 // Pour les cas d'erreur
-export const duplicateEmailDto: CreateUserDto = {
+export const duplicateEmailDto: RegisterDto = {
   email: 'existing@example.com',
   password: 'password123',
   firstName: 'Existing',

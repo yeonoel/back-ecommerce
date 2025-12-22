@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './users.service';
+import { UsersService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { CreateUserDto } from './dto/Create-user.dto';
+import { RegisterDto } from './dto/Register.dto';
 import { ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from './enum/userRole.enum';
@@ -13,7 +13,7 @@ import { UserRole } from './enum/userRole.enum';
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
-describe('UsersService', () => {
+describe('AuthService', () => {
   let service: UsersService;
   let userRepository: Repository<User>;
   let jwtService: JwtService;
@@ -27,7 +27,7 @@ describe('UsersService', () => {
     lastName: 'Doe'
   } as User;
 
-  const createUserDto: CreateUserDto = {
+  const createUserDto: RegisterDto = {
     email: 'F4TQ5@example.com',
     password: 'password123',
     firstName: 'John',
@@ -78,7 +78,7 @@ describe('UsersService', () => {
       
       await expect(service.register(createUserDto)).rejects.toThrow(ConflictException)
 
-      expect(service.register(createUserDto)).rejects.toThrow('User with this email already exists');
+      expect(service.register(createUserDto)).rejects.toThrow('email already exists');
     });
 
     it('should hash password before saving new user', async () => {

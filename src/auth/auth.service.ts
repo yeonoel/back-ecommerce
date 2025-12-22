@@ -1,9 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CreateUserDto } from './dto/Create-user.dto';
+import { RegisterDto } from './dto/Register.dto';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from './enum/userRole.enum';
 import { JwtService } from '@nestjs/jwt';
@@ -19,30 +18,30 @@ export class UsersService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService
   ) {}
-  async register(createUserDto: CreateUserDto): Promise<UsersResponseDto> {
+  async register(registerDto: RegisterDto): Promise<UsersResponseDto> {
 
-    const user = await this.userRepository.findOne({where: {email: createUserDto.email}});
+    const user = await this.userRepository.findOne({where: {email: registerDto.email}});
 
     if (user) {
       throw new ConflictException('email already exists');
     }
 
-    if(createUserDto.phone) {
-      const existingPhone = await this.userRepository.findOne({where: {phone: createUserDto.phone}});
+    if(registerDto.phone) {
+      const existingPhone = await this.userRepository.findOne({where: {phone: registerDto.phone}});
       if (existingPhone) {
         throw new ConflictException('phone already exists');
       }
     }
 
-    const password = await bcrypt.hash(createUserDto.password, 10);
+    const password = await bcrypt.hash(registerDto.password, 10);
 
     const newUser =  this.userRepository.create({
-      email: createUserDto.email,
+      email: registerDto.email,
       password,
-      firstName: createUserDto.firstName,
-      lastName: createUserDto.lastName,
-      phone: createUserDto.phone,
-      avatarUrl: createUserDto.avatarUrl,
+      firstName: registerDto.firstName,
+      lastName: registerDto.lastName,
+      phone: registerDto.phone,
+      avatarUrl: registerDto.avatarUrl,
       role: UserRole.CUSTOMER,
       isActive: true,
       emailVerified: false,
@@ -59,22 +58,6 @@ export class UsersService {
    const token = this.jwtService.sign(payload);
 
    return this.buildAuthResponse(newUser, token);
-  }
-
-  findAll() {
-    return `This action returns all users`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
-  }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} user`;
   }
 
 

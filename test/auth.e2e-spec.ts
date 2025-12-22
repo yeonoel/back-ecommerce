@@ -1,9 +1,9 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Repository } from "typeorm";
-import { buildUserDto } from "../src/users/fixtures/users.fixtures";
-import { User } from "../src/users/entities/user.entity";
-import { getRepositoryToken, TypeOrmModule } from "@nestjs/typeorm";
+import { buildUserDto } from "../src/auth/fixtures/users.fixtures";
+import { User } from "../src/auth/entities/user.entity";
+import { getRepositoryToken, } from "@nestjs/typeorm";
 import { TestAppModule } from "./test-app.module";
 
 const request = require('supertest');
@@ -12,7 +12,6 @@ describe('AuthController (e2e)', () => {
     let userRepository: Repository<User>;
 
     beforeAll(async () => {
-      // TODO: Récupérer le secret JWT de la variable d'environnement
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [TestAppModule],
     }).compile();
@@ -26,18 +25,13 @@ describe('AuthController (e2e)', () => {
       }),
     );
 
-    
-
     app.setGlobalPrefix('api/');
     await app.init();
-
     userRepository = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
-    
   });
 
 
   describe('POST /api/auth/register', () => {
-
     it('should return 201 and create a new user', async () => {
         const userDto = buildUserDto();
 

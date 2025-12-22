@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../auth/entities/user.entity';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from '../../users/enum/userRole.enum';
+import { UserRole } from '../../auth/enum/userRole.enum';
 
 export async function seedUsers(dataSource: DataSource) {
   const userRepository = dataSource.getRepository(User);

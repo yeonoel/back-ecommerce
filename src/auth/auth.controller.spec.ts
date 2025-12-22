@@ -1,7 +1,7 @@
 // users.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
+import { UsersController } from './auth.controller';
+import { UsersService } from './auth.service';
 import { HttpStatus } from '@nestjs/common';
 
 // Import depuis vos fichiers séparés
@@ -11,7 +11,7 @@ import {
 } from './fixtures/users.fixtures';
 import { createMockUsersService} from './mocks/user.service.mock';
 
-describe('UsersController', () => {
+describe('AuthController', () => {
   let controller: UsersController;
   let service: UsersService;
   let mockUsersService;

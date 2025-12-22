@@ -5,7 +5,7 @@ import configuration from '../src/config/configuration';
 import { testDbConfig } from './test-db.config';
 import { CategoriesModule } from '../src/categories/categories.module';
 import { ProductsModule } from '../src/products/products.module';
-import { UsersModule } from '../src/users/users.module';
+import { AuthModule } from '../src/auth/auth.module';
 import { ProductVariantsModule } from '../src/product-variants/product-variants.module';
 import { CartsModule } from '../src/carts/carts.module';
 import { OrdersModule } from '../src/orders/orders.module';
@@ -30,7 +30,7 @@ import { AppService } from '../src/app.service';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => (testDbConfig),
     }),
-    UsersModule,
+    AuthModule,
     CategoriesModule,
     ProductsModule,
     ProductsModule,

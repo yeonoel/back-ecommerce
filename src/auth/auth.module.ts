@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { UsersController } from './users.controller';
+import { UsersService } from './auth.service';
+import { UsersController } from './auth.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -23,4 +23,4 @@ import { AUTH_CONSTANTS } from '../common/constants/auth.constants';
   providers: [UsersService],
   exports: [UsersService]
 })
-export class UsersModule {}
+export class AuthModule {}
