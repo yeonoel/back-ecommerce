@@ -25,7 +25,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe());
 
   // Toutes les routes commencent par /api
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api/');
 
   await app.listen(port);
   console.log(`✅ API listening on http://localhost:${port}/api`);

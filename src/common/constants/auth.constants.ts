@@ -1,0 +1,5 @@
+export const AUTH_CONSTANTS = {
+  BCRYPT_ROUNDS: 10,
+  TOKEN_EXPIRATION: '7d',
+  REFRESH_TOKEN_EXPIRATION: '30d',
+} as const;

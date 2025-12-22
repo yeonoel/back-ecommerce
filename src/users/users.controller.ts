@@ -1,15 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserDto } from './dto/Create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersResponseDto } from './dto/Users-response';
 
-@Controller('users')
+@Controller('auth')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @Post("register")
+  @HttpCode(HttpStatus.CREATED)
+  register(@Body() createUserDto: CreateUserDto): Promise<UsersResponseDto> {
+    return this.usersService.register(createUserDto);
   }
 
   @Get()

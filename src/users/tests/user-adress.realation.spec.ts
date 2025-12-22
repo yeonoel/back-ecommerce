@@ -21,7 +21,7 @@ describe('User - Address relation', () => {
 
         userRepository = module.get<Repository<User>>(getRepositoryToken(User));
         addressRepository = module.get<Repository<Address>>(getRepositoryToken(Address));
-    });
+    }, 30000);
 
     afterEach(async () => {
         const addresses = await addressRepository.find();

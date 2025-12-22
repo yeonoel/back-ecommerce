@@ -31,7 +31,7 @@ export const testDbConfig: TypeOrmModuleOptions = {
   // Chercher les entités
   entities: [join(__dirname, '../**/*.entity{.ts,.js}')],
   
-  synchronize: true, // Synchronisation automatique des schémas
+  synchronize: true,
   dropSchema: true,// Pour les tests, on réinitialise le schéma à chaque fois
-  logging: ['error']
+  logging: false,
 };
