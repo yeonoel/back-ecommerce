@@ -3,6 +3,7 @@
 import { Exclude } from 'class-transformer';
 import { Address } from '../../addresses/entities/address.entity';
 import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { UserRole } from '../enum/userRole.enum';
 
 @Entity("users") // Nom de la table dans PostgreSQL
 export class User {
@@ -33,7 +34,7 @@ export class User {
   lastName: string;
 
   // phone VARCHAR(20)
-  @Column({ length: 20, nullable: true })
+  @Column({ length: 20, nullable: true, unique: true })
   phone: string;
 
   // avatar_url VARCHAR(500)
@@ -49,9 +50,9 @@ export class User {
   isActive: boolean;
 
   // role VARCHAR(20) DEFAULT 'customer'
-  @Column({ length: 20, default: 'customer' })
+  @Column({type: 'enum', enum: UserRole, default: UserRole.CUSTOMER })
   // @Index() // Index pour performance sur le rôle
-  role: string;
+  role: UserRole;
 
   // created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   @CreateDateColumn({ name: 'created_at' })

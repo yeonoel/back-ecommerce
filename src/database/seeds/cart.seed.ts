@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Cart } from '../../carts/entities/cart.entity';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../auth/entities/user.entity';
+import { UserRole } from '../../auth/enum/userRole.enum';
 
 export async function seedCarts(ds: DataSource) {
   console.log('seedCarts loaded');
@@ -9,7 +10,7 @@ export async function seedCarts(ds: DataSource) {
   const userRepo = ds.getRepository(User);
 
   const users = await userRepo.find({ 
-    where: { role: 'customer' } 
+    where: { role: UserRole.CUSTOMER } 
   });
   
   if (users.length < 2) {

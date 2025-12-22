@@ -19,12 +19,14 @@ import { CouponsModule } from './coupons/coupons.module';
 import { CouponUsageModule } from './coupon-usage/coupon-usage.module';
 import { WishlistsModule } from './wishlists/wishlists.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AuthModule } from './auth/auth.module';
+
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.development', // Spécifier explicitement
+      envFilePath: '.env',
       load: [ configuration ],
     }),
     TypeOrmModule.forRootAsync({
@@ -32,6 +34,7 @@ import { NotificationsModule } from './notifications/notifications.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => (typeOrmConfig),
     }),
+    AuthModule,
     CategoriesModule,
     ProductsModule,
     ProductsImagesModule,
@@ -46,6 +49,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     CouponUsageModule,
     WishlistsModule,
     NotificationsModule,
+    AuthModule,
+    
   ],
   controllers: [AppController],
   providers: [AppService],

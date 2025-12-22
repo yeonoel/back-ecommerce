@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { User } from '../../auth/entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { UserRole } from '../../auth/enum/userRole.enum';
 
 export async function seedUsers(dataSource: DataSource) {
   const userRepository = dataSource.getRepository(User);
@@ -11,21 +12,21 @@ export async function seedUsers(dataSource: DataSource) {
       password: await bcrypt.hash('password123', 10),
       firstName: 'Admin',
       lastName: 'User',
-      role: 'admin',
+      role: UserRole.ADMIN,
     },
     {
       email: 'john@test.com',
       password: await bcrypt.hash('password321', 10),
       firstName: 'John',
       lastName: 'Doe',
-      role: 'customer',
+      role: UserRole.CUSTOMER,
     },
     {
       email: 'jane@test.com',
       password: await bcrypt.hash('password213', 10),
       firstName: 'Jane',
       lastName: 'Doe',
-      role: 'customer',
+      role: UserRole.CUSTOMER,
     },
   ];
 

@@ -21,8 +21,9 @@ export const typeOrmConfig: DataSourceOptions = {
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   
   synchronize: false,
-  logging: process.env.NODE_ENV === 'development',
+  logging: true,
   migrationsTableName: 'migrations',
+
 };
 
 // DataSource pour les migrations CLI
