@@ -27,10 +27,11 @@ export class UsersService {
       throw new ConflictException('email already exists');
     }
 
-    const existingPhone = await this.userRepository.findOne({where: {phone: createUserDto.phone}});
-
-    if (existingPhone) {
-      throw new ConflictException('phone already exists');
+    if(createUserDto.phone) {
+      const existingPhone = await this.userRepository.findOne({where: {phone: createUserDto.phone}});
+      if (existingPhone) {
+        throw new ConflictException('phone already exists');
+      }
     }
 
     const password = await bcrypt.hash(createUserDto.password, 10);
@@ -47,7 +48,7 @@ export class UsersService {
       emailVerified: false,
    });
     
-   console.log('JWT_SECRET:', this.configService.get('JWT_SECRET'));
+   console.log('JWT_SECRET:', this.configService.get<string>('security.jwtSecret'));
     await this.userRepository.save(newUser);
     
     const payload = {
@@ -56,9 +57,6 @@ export class UsersService {
    }
 
    const token = this.jwtService.sign(payload);
-
-   console.log('JWT_SECRET from ConfigService:', this.configService.get('JWT_SECRET'));
-   console.log('JWT_SECRET at startup:', process.env.JWT_SECRET);
 
    return this.buildAuthResponse(newUser, token);
   }

@@ -14,7 +14,7 @@ import { AUTH_CONSTANTS } from '../common/constants/auth.constants';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('security.jwtSecret'),
         signOptions: { expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRATION },
       }),
     }),

@@ -1,10 +1,10 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Repository } from "typeorm";
-import { AppModule } from "../src/app.module";
 import { buildUserDto } from "../src/users/fixtures/users.fixtures";
 import { User } from "../src/users/entities/user.entity";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { getRepositoryToken, TypeOrmModule } from "@nestjs/typeorm";
+import { TestAppModule } from "./test-app.module";
 
 const request = require('supertest');
 describe('AuthController (e2e)', () => {
@@ -13,9 +13,8 @@ describe('AuthController (e2e)', () => {
 
     beforeAll(async () => {
       // TODO: Récupérer le secret JWT de la variable d'environnement
-      process.env.JWT_SECRET = 'ec55909882f29b4a167b64752a8edb78';
       const moduleFixture: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
+        imports: [TestAppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -27,18 +26,20 @@ describe('AuthController (e2e)', () => {
       }),
     );
 
+    
+
     app.setGlobalPrefix('api/');
     await app.init();
 
     userRepository = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
+    
   });
 
 
   describe('POST /api/auth/register', () => {
-    const userDto = buildUserDto();
 
     it('should return 201 and create a new user', async () => {
-          const userDto = buildUserDto();
+        const userDto = buildUserDto();
 
         const response = await request(app.getHttpServer())
             .post('/api/auth/register')
@@ -65,10 +66,12 @@ describe('AuthController (e2e)', () => {
              .send(userDto)
              .expect(409);
 
-         expect(response.body.message).toContain('User with this email already exists');
+         expect(response.body.message).toContain('email already exists');
      });
 
       it('should hash password before storing in database', async () => {
+          const userDto = buildUserDto();
+
           const response = await request(app.getHttpServer())
               .post('/api/auth/register')
               .send(userDto)
