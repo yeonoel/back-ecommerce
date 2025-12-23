@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
+  constructor(private readonly userRepository: Repository<User> ) {}
+
+  async findOneByEmail(email: string): Promise<User | null> {
+    const user = await this.userRepository.findOne({where: {email: email}});
+    return user
+  }
   create(createUserDto: CreateUserDto) {
     return 'This action adds a new user';
   }

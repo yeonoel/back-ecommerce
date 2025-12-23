@@ -8,5 +8,10 @@ export class UserDataDto {
 export class UsersResponseDto {
   success: boolean;
   data: UserDataDto;
+}
+
+export class AuthLoginResponseDto {
+  success: boolean;
+  data: UserDataDto;
   token: string;
 }
