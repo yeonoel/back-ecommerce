@@ -2,37 +2,54 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Auth, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RegisterDto } from './dto/Register.dto';
 import { ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '../users/enum/userRole.enum';
-import { User } from '../../src/users/entities/user.entity';
+import { User } from '../users/entities/user.entity';
+import { UsersService } from '../users/users.service';
 
+// Mock de bcrypt
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
+
 describe('AuthService', () => {
   let service: AuthService;
   let userRepository: Repository<User>;
   let jwtService: JwtService;
   let configService: ConfigService;
+  let usersService: UsersService;
 
-  const user1 = {
-    id: '1',
-    email: 'F4TQ5@example.com',
-    password: 'password123',
+  const mockUser = {
+    id: "1",
+    email: 'test@example.com',
+    password: 'hashed_password',
     firstName: 'John',
-    lastName: 'Doe'
+    lastName: 'Doe',
+    role: UserRole.CUSTOMER,
+    isActive: true,
+    emailVerified: false,
   } as User;
 
-  const createUserDto: RegisterDto = {
-    email: 'F4TQ5@example.com',
+  const registerDto: RegisterDto = {
+    email: 'test@example.com',
     password: 'password123',
     firstName: 'John',
-    lastName: 'Doe'
-  } ;
+    lastName: 'Doe',
+    phone: '+1234567890',
+    avatarUrl: 'http://example.com/avatar.jpg'
+    
+  };
+
+  const registerDtoWithoutPhone: RegisterDto = {
+    email: 'test2@example.com',
+    password: 'password123',
+    firstName: 'Jane',
+    lastName: 'Smith'
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,13 +57,23 @@ describe('AuthService', () => {
         AuthService,
         {
           provide: getRepositoryToken(User),
-          useClass: Repository
+          useValue: {
+            findOne: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          }
         },
         {
           provide: JwtService,
           useValue: {
-            sign: jest.fn(),
-          },
+            sign: jest.fn().mockReturnValue('mock-jwt-token'),
+          }
+        },
+        {
+          provide: UsersService,
+          useValue: {
+            findByEmail: jest.fn()
+          }
         },
         {
           provide: ConfigService,
@@ -54,7 +81,6 @@ describe('AuthService', () => {
             get: jest.fn().mockReturnValue('test_jwt_secret'),
           },
         }
-      
       ],
     }).compile();
 
@@ -62,10 +88,12 @@ describe('AuthService', () => {
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
     jwtService = module.get<JwtService>(JwtService);
     configService = module.get<ConfigService>(ConfigService);
+    usersService = module.get<UsersService>(UsersService);
+
   });
 
-  beforeEach(async () => {
-    (bcrypt.hash as jest.Mock).mockClear();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -73,85 +101,206 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should throw ConflictException if user already exists', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user1);
-      
-      await expect(service.register(createUserDto)).rejects.toThrow(ConflictException)
+    it('should throw ConflictException if email already exists', async () => {
+      // Arrange
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser)
 
-      expect(service.register(createUserDto)).rejects.toThrow('email already exists');
+      // Act 
+        const registerPromise = service.register(registerDto);
+      // Assert
+      await expect(registerPromise).rejects.toThrow(ConflictException);
+      await expect(registerPromise).rejects.toThrow('email already exists');
     });
 
-    it('should hash password before saving new user', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'create').mockReturnValue(user1);
-      jest.spyOn(userRepository, 'save').mockResolvedValue(user1)
-      jest.spyOn(jwtService, 'sign').mockReturnValue('test_token');
-
-      (bcrypt.hash as jest.Mock).mockResolvedValue('azzIiBU1224#IROIOJVOE');
-
-      await service.register(createUserDto);
-
-      expect(bcrypt.hash).toHaveBeenCalledWith(createUserDto.password, 10);
-    });
-
-    it('should return a JWT tokent after succesfull registration', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'create').mockReturnValue(user1);
-      jest.spyOn(userRepository, 'save').mockResolvedValue(user1);
-      jest.spyOn(jwtService, 'sign').mockReturnValue('test-tokenazzIiBU1224#IROIOJVOE');
+    it('should throw ConflictException if phone already exists', async () => {
+      // Arrange
+      jest.spyOn(userRepository, 'findOne').mockResolvedValueOnce(null).mockResolvedValueOnce(mockUser);
 
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
 
-      const result = await service.register(createUserDto);
+      // Act
+      const registerPromise = service.register(registerDto); 
 
-      expect(result.token).toBe('test-tokenazzIiBU1224#IROIOJVOE');
-      expect(result.success).toBe(true);
-      expect(jwtService.sign).toHaveBeenCalledWith({sub: user1.id, email: user1.email});
+      //Assert
+      await expect(registerPromise).rejects.toThrow(ConflictException);
+      await expect(registerPromise).rejects.toThrow('phone already exists');
     });
 
-    it('should create and save user with correct data', async () => {
+    it('should not check phone if phone is not provided', async () => {
+      // Arrange
+      const findOneSpy = jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
+      jest.spyOn(userRepository, 'create').mockReturnValue(mockUser);
+      jest.spyOn(userRepository, 'save').mockResolvedValue(mockUser);
+
+      // Act
+      await service.register(registerDtoWithoutPhone);
+
+      // Assert
+      expect(findOneSpy).toHaveBeenCalledTimes(1);
+      expect(findOneSpy).toHaveBeenCalledWith({ where: { email: registerDtoWithoutPhone.email }});
+    });
+
+    it('should hash password before saving new user', async () => {
+      // Arrange
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      const createUser = jest.spyOn(userRepository, 'create').mockReturnValue(user1);
-      const saveUser = jest.spyOn(userRepository, 'save').mockResolvedValue(user1);
-      jest.spyOn(jwtService, 'sign').mockReturnValue('mock-token');
+      jest.spyOn(userRepository, 'create').mockReturnValue(mockUser);
+      jest.spyOn(userRepository, 'save').mockResolvedValue(mockUser);
+
+      const hashedPassword = 'azzIiBU1224#IROIOJVOE';
+      (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+
+      // Act
+      await service.register(registerDto);
+
+      // Assert
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 10);
+    });
+
+    it('should create user with correct data and call login', async () => {
+      // Arrange
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+      const createSpy = jest.spyOn(userRepository, 'create').mockReturnValue(mockUser);
+      const saveSpy = jest.spyOn(userRepository, 'save').mockResolvedValue(mockUser);
       
-      (bcrypt.hash as jest.Mock).mockResolvedValue('azzIiBU1224#IROIOJVOE');
+      const hashedPassword = 'azzIiBU1224#IROIOJVOE';
+      (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
 
-      await service.register(createUserDto);
+      // Mock de la méthode login
+      const loginSpy = jest.spyOn(service, 'login').mockResolvedValue({
+        success: true,
+        data: {
+          id: mockUser.id,
+          email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName
+        },
+        token: 'mock-jwt-token'
+      });
 
-      expect(createUser).toHaveBeenCalledWith({
-        email: createUserDto.email,
-        password: 'azzIiBU1224#IROIOJVOE',
-        firstName: createUserDto.firstName,
-        lastName: createUserDto.lastName,
-        phone: createUserDto.phone,
-        avatarUrl: createUserDto.avatarUrl,
+      // Act
+      await service.register(registerDto);
+
+      // Assert
+      expect(createSpy).toHaveBeenCalledWith({
+        email: registerDto.email,
+        password: hashedPassword,
+        firstName: registerDto.firstName,
+        lastName: registerDto.lastName,
+        phone: registerDto.phone,
+        avatarUrl: registerDto.avatarUrl,
         role: UserRole.CUSTOMER,
         isActive: true,
         emailVerified: false,
       });
-      expect(saveUser).toHaveBeenCalled();
+      
+      // Vérifie que login est appelé avec le user créé
+      expect(loginSpy).toHaveBeenCalledWith(mockUser);
     });
 
-    it('should return correct user data in response', async () => {
+    it('should return JWT token after successful registration', async () => {
+      // Arrange
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'create').mockReturnValue(user1);
-      jest.spyOn(userRepository, 'save').mockResolvedValue(user1);
-      jest.spyOn(jwtService, 'sign').mockReturnValue('ferferfrefrtoken');
+      jest.spyOn(userRepository, 'create').mockReturnValue(mockUser);
+      jest.spyOn(userRepository, 'save').mockResolvedValue(mockUser);
 
-      (bcrypt.hash as jest.Mock).mockResolvedValue('azzIiBU1224#IROIOJVOE');
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
 
-      const result = await service.register(createUserDto);
-
-      expect(result.success).toBe(true);
-      expect(result.token).toBe('ferferfrefrtoken');
-      expect(result.data).toEqual({
-        id: user1.id,
-        email: user1.email,
-        firstName: user1.firstName,
-        lastName: user1.lastName,
+      jest.spyOn(service, 'login').mockResolvedValue({
+        success: true,
+        data: {
+          id: mockUser.id,
+          email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName
+        },
+        token: 'test-jwt-token'
       });
-    })
-  })
-})
 
+      // Act
+      const result = await service.register(registerDto);
+
+      // Assert
+      expect(result.token).toBe('test-jwt-token');
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({
+        id: mockUser.id,
+        email: mockUser.email,
+        firstName: mockUser.firstName,
+        lastName: mockUser.lastName
+      });
+    });
+  });
+
+  describe('login', () => {
+    const userToLogin = {
+      ...mockUser,
+      lastLoginAt: new Date(),
+    } as User;
+
+    it('should update lastLoginAt and save user', async () => {
+      // Arrange
+      const user = jest.spyOn(userRepository, 'save').mockResolvedValue(userToLogin);
+
+      // Act
+      await service.login(userToLogin);
+
+      // Assert
+      expect(user).toHaveBeenCalledWith(userToLogin);
+      expect(userToLogin.lastLoginAt).toBeInstanceOf(Date);
+    });
+
+    it('should generate JWT token with correct payload', async () => {
+      // Arrange
+      jest.spyOn(userRepository, 'save').mockResolvedValue(userToLogin);
+
+      // Act
+      await service.login(userToLogin);
+
+      // Assert
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: userToLogin.id,
+        email: userToLogin.email,
+        role: userToLogin.role
+      });
+    });
+
+    it('should return correct AuthResponseDto', async () => {
+      // Arrange
+      jest.spyOn(userRepository, 'save').mockResolvedValue(userToLogin);
+
+      // Act
+      const result = await service.login(userToLogin);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.token).toBe('mock-jwt-token');
+      expect(result.data).toEqual({
+        id: userToLogin.id,
+        email: userToLogin.email,
+        firstName: userToLogin.firstName,
+        lastName: userToLogin.lastName
+      });
+    });
+
+  });
+
+  describe('buildAuthResponse (private method)', () => {
+    it('should return correct response structure', async () => {
+      // On ne peut pas tester directement une méthode privée
+      // Mais on peut tester son comportement à travers login
+      jest.spyOn(userRepository, 'save').mockResolvedValue(mockUser);
+
+      const result = await service.login(mockUser);
+
+      expect(result).toHaveProperty('success', true);
+      expect(result).toHaveProperty('token');
+      expect(result).toHaveProperty('data');
+      expect(result.data).toHaveProperty('id');
+      expect(result.data).toHaveProperty('email');
+      expect(result.data).toHaveProperty('firstName');
+      expect(result.data).toHaveProperty('lastName');
+    });
+  });
+});

@@ -6,10 +6,9 @@ import * as bcrypt from 'bcrypt';
 import { UserRole } from '../users/enum/userRole.enum';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthLoginResponseDto, UsersResponseDto } from './dto/Users-response';
+import { AuthResponseDto } from './dto/Users-response';
 import { User } from '../users/entities/user.entity';
-import { UsersService } from 'src/users/users.service';
-import { LoginDto } from './dto/Login.dto';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
@@ -23,32 +22,25 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.UsersService.findOneByEmail(email);
-    if(!user) {
-      throw new BadRequestException('User not found');
-    }
+    if(!user) return null;
+
     const ismatch = await bcrypt.compare(password, user.password);
-    if(!ismatch) {
-      throw new BadRequestException('Password does not match');
-    }
+    if(!ismatch) return null;
+
     return user
   }
-  async register(registerDto: RegisterDto): Promise<UsersResponseDto> {
-
+  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const user = await this.userRepository.findOne({where: {email: registerDto.email}});
-
     if (user) {
       throw new ConflictException('email already exists');
     }
-
     if(registerDto.phone) {
       const existingPhone = await this.userRepository.findOne({where: {phone: registerDto.phone}});
       if (existingPhone) {
         throw new ConflictException('phone already exists');
       }
     }
-
     const password = await bcrypt.hash(registerDto.password, 10);
-
     const newUser =  this.userRepository.create({
       email: registerDto.email,
       password,
@@ -59,32 +51,27 @@ export class AuthService {
       role: UserRole.CUSTOMER,
       isActive: true,
       emailVerified: false,
-   });
-    
-   console.log('JWT_SECRET:', this.configService.get<string>('security.jwtSecret'));
-    await this.userRepository.save(newUser);
+    });
+
+    return this.login(newUser);
+  }
+
+  async login(user: User): Promise<AuthResponseDto> {
+    user.lastLoginAt = new Date();
+    await this.userRepository.save(user);
     
     const payload = {
-    sub: newUser.id,
-    email: newUser.email,
-    role: newUser.role
+    sub: user.id,
+    email: user.email,
+    role: user.role
    }
 
    const token = this.jwtService.sign(payload);
 
-   return this.buildAuthResponse(newUser, token);
-  }
+   return this.buildAuthResponse(user, token);
+  }  
 
-  async login(loginDto: LoginDto): Promise<AuthLoginResponseDto> {
-    const payload = loginDto;
-    const token = this.jwtService.sign(payload);
-
-    const user = await this.UsersService.findOneByEmail(loginDto.email);
-
-    if(!user) {
-      throw new BadRequestException('User not found');
-    }
-
+  private buildAuthResponse(user: User, token: string): AuthResponseDto {
     return {
       success: true,
       data: {
@@ -94,19 +81,6 @@ export class AuthService {
         lastName: user.lastName,
       },
       token: token
-    };
-  }
-  
-
-  private buildAuthResponse(user: User, token: string): UsersResponseDto {
-    return {
-      success: true,
-      data: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      }
     };
   }
 }
