@@ -4,9 +4,10 @@ import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
-import { Order } from 'src/orders/entities/order.entity';
 import { Address } from './entities/address.entity';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Addresses')
 @UseGuards(JwtAuthGuard)
 @Controller('users/me/addresses')
 export class AddressesController {
