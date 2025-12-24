@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { AddressesModule } from './addresses/addresses.module';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CouponUsageModule,
     WishlistsModule,
     NotificationsModule,
-    UsersModule,    
+    UsersModule,
+    AddressesModule
   ],
   controllers: [AppController],
   providers: [

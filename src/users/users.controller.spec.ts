@@ -3,7 +3,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { Repository } from 'typeorm';
+import { MockRepository } from '../common/tests/mocks/mocksRepository';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -15,13 +15,15 @@ describe('UsersController', () => {
         UsersService,
         {
           provide: getRepositoryToken(User),
-          useClass: Repository
+          useValue: MockRepository
         },
       ],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
   });
+
+  
 
   it('should be defined', () => {
     expect(controller).toBeDefined();

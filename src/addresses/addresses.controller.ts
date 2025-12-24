@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { AddressesService } from './addresses.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/user.decorator';
 import { Address } from './entities/address.entity';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -14,8 +14,8 @@ export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
 
   @Post()
-  create(@CurrentUser() user, @Body() createAddressDto: CreateAddressDto) {
-    return this.addressesService.create(user.id, createAddressDto);
+  createAddress(@CurrentUser() user, @Body() createAddressDto: CreateAddressDto) {
+    return this.addressesService.createAddress(user.id, createAddressDto);
   }
 
   @Get()
@@ -25,18 +25,18 @@ export class AddressesController {
 
  
   @Patch(':id')
-  update(
+  updateAddress(
     @CurrentUser() user,
     @Param('id') addressId: string,
     @Body() updateAddressDto: UpdateAddressDto) {
-    return this.addressesService.updateAdress(user.id, addressId, updateAddressDto);
+    return this.addressesService.updateAddress(user.id, addressId, updateAddressDto);
   }
 
   @Delete(':id')
-  remove(
+  removeAddress(
     @CurrentUser() user,
     @Param('id') adressId: string
   ) {
-    return this.addressesService.removeAdress(user.id, adressId);
+    return this.addressesService.removeAddress(user.id, adressId);
   }
 }
