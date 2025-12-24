@@ -4,7 +4,7 @@ import { RegisterDto } from './dto/Register.dto';
 import { AuthResponseDto } from './dto/Users-response';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { Public } from './decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('auth')
 @Public()
