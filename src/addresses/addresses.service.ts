@@ -22,12 +22,12 @@ export class AddressesService {
         await manager.update(Address, {userId}, {isDefault: false});
       }
       const newAddress = manager.create(Address, {...createAddressDto, userId});
-      await manager.save(newAddress); 
+      const savedAddress = await manager.save(newAddress); 
 
       return {
         success: true,
         message: 'Address created successfully',
-        data: newAddress
+        data: savedAddress
       }
     });
   }

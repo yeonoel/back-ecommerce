@@ -23,6 +23,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AddressesModule } from './addresses/addresses.module';
+import { RolesGuard } from './common/guards/roles.gaurds';
 
 @Module({
   imports: [
@@ -60,7 +61,11 @@ import { AddressesModule } from './addresses/addresses.module';
     {
       provide: 'APP_GUARD',
       useClass: JwtAuthGuard,
-    }
+    },
+    {
+      provide: 'APP_GUARD',
+      useClass: RolesGuard,
+    },
   ],
 })
 export class AppModule {}

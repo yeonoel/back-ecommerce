@@ -8,7 +8,6 @@ import { Address } from './entities/address.entity';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Addresses')
-@UseGuards(JwtAuthGuard)
 @Controller('users/me/addresses')
 export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
@@ -22,7 +21,6 @@ export class AddressesController {
   findByUser(@CurrentUser() user): Promise<Address[]> {
     return this.addressesService.findByUser(user.id);
   }
-
  
   @Patch(':id')
   updateAddress(

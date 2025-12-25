@@ -27,7 +27,6 @@ describe('AddressesController', () => {
         }
       ],
     }).compile();
-
     controller = module.get<AddressesController>(AddressesController);
     service = module.get<AddressesService>(AddressesService);
   });
