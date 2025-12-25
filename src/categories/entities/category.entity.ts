@@ -4,11 +4,11 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 @Index("idx_categories_slug", ["slug"])
 export class Category {
     @PrimaryGeneratedColumn("uuid")
-
     id: string;
-    @Column({length: 100, nullable: false})
-
+    
+    @Column({length: 100, unique: true, nullable: false})
     name: string;
+
     @Column({length: 255, nullable: false})
     slug: string;
 

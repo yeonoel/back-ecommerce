@@ -1,7 +1,8 @@
 // test/fixtures/users.fixtures.ts
 
-import { UsersResponseDto } from "../dto/Users-response";
+import { Auth } from "typeorm";
 import { RegisterDto } from "../dto/Register.dto";
+import { AuthResponseDto } from "../dto/Users-response";
 
 export const buildUserDto = () => ({
   email: `test${Date.now()}${Math.random()}@example.com`,
@@ -30,7 +31,7 @@ export const mockCreateUserDtoWithOptional: RegisterDto = {
   avatarUrl: 'https://example.com/avatar.jpg'
 };
 
-export const mockAuthResponse: UsersResponseDto = {
+export const mockAuthResponse: AuthResponseDto = {
   success: true,
   data: {
     id: '1',
@@ -41,7 +42,7 @@ export const mockAuthResponse: UsersResponseDto = {
   token: 'jwt-token-here'
 };
 
-export const mockAuthResponseWithOptional: UsersResponseDto = {
+export const mockAuthResponseWithOptional: AuthResponseDto = {
   success: true,
   data: {
     id: '2',

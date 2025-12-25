@@ -9,8 +9,8 @@ import {
   Index,
   OneToMany
 } from 'typeorm';
-import { User } from '../../auth/entities/user.entity';
 import { AddressType } from '../enums/address-type.enum';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('addresses')
 @Index('idx_addresses_user_id', ['user'])

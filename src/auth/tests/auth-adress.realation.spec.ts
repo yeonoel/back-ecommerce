@@ -1,10 +1,10 @@
 import { Repository } from "typeorm"
-import { User } from "../entities/user.entity";
 import { Address } from "../../addresses/entities/address.entity";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken, TypeOrmModule } from "@nestjs/typeorm";
 import { testDbConfig } from "../../../test/test-db.config";
 import { AddressType } from "../../addresses/enums/address-type.enum";
+import { User } from "../../../src/users/entities/user.entity";
 
 describe('User - Address relation', () => {
     let userRepository: Repository<User>;

@@ -1,34 +1,40 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { AddressesService } from './addresses.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/user.decorator';
+import { Address } from './entities/address.entity';
+import { ApiTags } from '@nestjs/swagger';
 
-@Controller('addresses')
+@ApiTags('Addresses')
+@Controller('users/me/addresses')
 export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
 
   @Post()
-  create(@Body() createAddressDto: CreateAddressDto) {
-    return this.addressesService.create(createAddressDto);
+  createAddress(@CurrentUser() user, @Body() createAddressDto: CreateAddressDto) {
+    return this.addressesService.createAddress(user.id, createAddressDto);
   }
 
   @Get()
-  findAll() {
-    return this.addressesService.findAll();
+  findByUser(@CurrentUser() user): Promise<Address[]> {
+    return this.addressesService.findByUser(user.id);
   }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.addressesService.findOne(+id);
-  }
-
+ 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAddressDto: UpdateAddressDto) {
-    return this.addressesService.update(+id, updateAddressDto);
+  updateAddress(
+    @CurrentUser() user,
+    @Param('id') addressId: string,
+    @Body() updateAddressDto: UpdateAddressDto) {
+    return this.addressesService.updateAddress(user.id, addressId, updateAddressDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.addressesService.remove(+id);
+  removeAddress(
+    @CurrentUser() user,
+    @Param('id') adressId: string
+  ) {
+    return this.addressesService.removeAddress(user.id, adressId);
   }
 }

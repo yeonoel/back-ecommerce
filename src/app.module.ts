@@ -20,7 +20,10 @@ import { CouponUsageModule } from './coupon-usage/coupon-usage.module';
 import { WishlistsModule } from './wishlists/wishlists.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
-
+import { UsersModule } from './users/users.module';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { AddressesModule } from './addresses/addresses.module';
+import { RolesGuard } from './common/guards/roles.gaurds';
 
 @Module({
   imports: [
@@ -49,10 +52,20 @@ import { AuthModule } from './auth/auth.module';
     CouponUsageModule,
     WishlistsModule,
     NotificationsModule,
-    AuthModule,
-    
+    UsersModule,
+    AddressesModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: 'APP_GUARD',
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: 'APP_GUARD',
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -2,9 +2,9 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Repository } from "typeorm";
 import { buildUserDto } from "../src/auth/fixtures/users.fixtures";
-import { User } from "../src/auth/entities/user.entity";
 import { getRepositoryToken, } from "@nestjs/typeorm";
 import { TestAppModule } from "./test-app.module";
+import { User } from "../src/users/entities/user.entity";
 
 const request = require('supertest');
 describe('AuthController (e2e)', () => {

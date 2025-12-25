@@ -1,6 +1,5 @@
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
@@ -8,9 +7,9 @@ import {
   CreateDateColumn,
   Unique,
 } from 'typeorm';
-import { User } from '../../auth/entities/user.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ProductVariant } from '../../product-variants/entities/product-variant.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('wishlists')
 @Index('idx_wishlists_user_id', ['user'])

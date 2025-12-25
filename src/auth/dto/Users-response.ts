@@ -5,7 +5,8 @@ export class UserDataDto {
   lastName: string;
 }
 
-export class UsersResponseDto {
+
+export class AuthResponseDto {
   success: boolean;
   data: UserDataDto;
   token: string;

@@ -1,17 +1,27 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
-import { UsersService } from './auth.service';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/Register.dto';
-import { UsersResponseDto } from './dto/Users-response';
+import { AuthResponseDto } from './dto/Users-response';
+import { ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { Public } from '../common/decorators/public.decorator';
 
+@ApiTags('auth')
+@Public()
 @Controller('auth')
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() createUserDto: RegisterDto): Promise<UsersResponseDto> {
-    return this.usersService.register(createUserDto);
+  register(@Body() createUserDto: RegisterDto): Promise<AuthResponseDto> {
+    return this.authService.register(createUserDto);
   }
 
-  
+  @UseGuards(AuthGuard('local'))
+  @Post("login")
+  @HttpCode(HttpStatus.OK)  
+  login(@Req() req): Promise<AuthResponseDto> {
+    return this.authService.login(req.user);
+  }  
 }
