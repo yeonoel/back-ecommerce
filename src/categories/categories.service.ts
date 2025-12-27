@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Category } from './entities/category.entity';
 import slugify from 'slugify';
 import { ResponseDto } from '../common/dto/ResponseDto';
+import { generateSlug } from 'src/common/utils/slug.util';
 
 @Injectable()
 export class CategoriesService {
@@ -15,7 +16,7 @@ export class CategoriesService {
   ) {}
   async createCategory(createCategoryDto: CreateCategoryDto): Promise<ResponseDto> {
     const {name} = createCategoryDto;
-    const slug = slugify(name, {lower: true})
+    const slug = generateSlug(name);
     const existing = await this.categoriesRepository.findOne({ where: { slug } });
     if (existing) {
       throw new ConflictException(`slug already exists`);
