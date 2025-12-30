@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { ProductFiltersDto } from './dto/ProductFiltersDto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -17,8 +18,8 @@ export class ProductsController {
   }
 
   @Get()
-  findAllProducts() {
-    return this.productsService.findAllProducts();
+  findAllProducts(@Query() filters: ProductFiltersDto) {
+    return this.productsService.findAllProducts(filters);
   }
 
   @Get(':id')
@@ -34,6 +35,7 @@ export class ProductsController {
 
   @Roles('admin')
   @Delete(':id')
+  @HttpCode(HttpStatus.OK)
   removeProduct(@Param('id') id: string) {
     return this.productsService.removeProduct(id);
   }
