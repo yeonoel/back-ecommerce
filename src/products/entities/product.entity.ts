@@ -6,7 +6,7 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, C
 
 @Entity('products')
 @Index('idx_products_slug', ['slug'])
-@Index('idx_products_category_id', ['category'])
+@Index('idx_products_category', ['category'])
 @Index('idx_products_is_active', ['isActive'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -77,9 +77,30 @@ export class Product {
   height?: number;
 
   @CreateDateColumn({name: 'created_at'})
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn({name: 'updated_at'})
-  updated_at: Date;
+  updatedAt: Date;
+
+  get isOnSale(): boolean {
+    // Retourne true si le produit est en promotion (prix inférieur au prix original)
+    return !!(this.compareAtPrice && this.price < this.compareAtPrice);
+  }
+
+  get discountPercentage(): number {
+    // Calcule le pourcentage de réduction si le produit est en promo
+    if (!this.compareAtPrice || this.compareAtPrice <= this.price) return 0;
+    return Math.round(((this.compareAtPrice - this.price) / this.compareAtPrice) * 100);
+  }
+
+  get isLowStock(): boolean {
+    // Retourne true si le stock est faible mais pas épuisé
+    return this.stockQuantity > 0 && this.stockQuantity <= this.lowStockThreshold;
+  }
+
+  get isOutOfStock(): boolean {
+    // Retourne true si le produit est en rupture de stock
+    return this.stockQuantity === 0;
+  }
 }
 

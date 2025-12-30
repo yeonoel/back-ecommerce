@@ -57,7 +57,7 @@ export class ProductsService {
         length: createDto.length,
         width: createDto.width,
         height: createDto.height,
-        categoryId: createDto.categoryId
+        category: category
       });
 
       if (createDto.images?.length) {
@@ -130,7 +130,7 @@ export class ProductsService {
       .leftJoinAndSelect('product.variants', 'variants');
 
     if (category) {
-      query.andWhere('product.categoryId = :category', { category });
+      query.andWhere('product.category = :category', { category });
     }
     if (minPrice) {
       query.andWhere('product.price >= :minPrice', { minPrice });
@@ -157,33 +157,46 @@ export class ProductsService {
     const skip = (page - 1) * limit;
     query.skip(skip).limit(limit);    
     const [items, total] = await query.getManyAndCount();
-
     return {
       success: true,
       message: 'Products found successfully',
       data: items,
       meta: {
-        items,
         total,
         page,
         limit
       }
     }
-}
+  }
 
   async findById(id: string): Promise<ResponseDto> {
-    const product = await this.productRepoisitory.findOne({
-      where: {id: id},
-      relations: ['images', 'variants', 'category']
-    });
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-    product.variants = product.variants.filter(variant => variant.isActive);
+    const product = await this.productRepoisitory
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect(
+        'product.variants',
+        'variants',
+        'variants.isActive = true',
+      )
+      .leftJoinAndSelect('product.category', 'category')
+      .where('product.id=:id', { id})
+      .andWhere('product.isActive = true')
+      .getOne();
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
     return {
       success: true,
       message: 'Product found successfully',
-      data: product
+      data: {
+        ...product,
+        isOnSale: product.isOnSale,
+        discountPercentage: product.discountPercentage,
+        isLowStock: product.isLowStock,
+        isOutOfStock: product.isOutOfStock
+      }
     }
   }
 
@@ -290,10 +303,22 @@ export class ProductsService {
     })
   }
 
-  removeProduct(id: string) {
-    return `This action removes a #${id} product`;
-  }
+  async removeProduct(id: string): Promise<ResponseDto> {
+    const product = await this.productRepoisitory.findOne({
+      where: { id },
+    });
 
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    await this.productRepoisitory.remove(product);
+
+    return {
+      success: true,
+      message: 'Product deleted successfully',
+    };
+  }
 
   /**
    * RULES:
