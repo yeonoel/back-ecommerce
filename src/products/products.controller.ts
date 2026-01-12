@@ -1,20 +1,25 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiTags } from '@nestjs/swagger';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { ProductFiltersDto } from './dto/ProductFiltersDto';
+import { Roles } from '../common/decorators/roles.decorator';
+import { ProductFiltersDto } from './dto/product-filters-dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ProductFormDataDto } from './dto/ProductFormData.dto';
+import { ProductMapper } from './mapper/ProductMapper';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+  ) {}
 
   @Roles('admin')
   @Post()
-  createProduct(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.createProduct(createProductDto);
+  @UseInterceptors(FilesInterceptor('images', 9))
+  async createProduct(@UploadedFiles() files : Express.Multer.File[], @Body() productFormDataDto: ProductFormDataDto) {
+    const createProductDto = ProductMapper.toCreateProductDto(productFormDataDto, []);
+    return this.productsService.createProduct(createProductDto, files);
   }
 
   @Get()
@@ -29,8 +34,14 @@ export class ProductsController {
 
   @Roles('admin')
   @Patch(':id')
-  updateProduct(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productsService.updateProduct(id, updateProductDto);
+  @UseInterceptors(FilesInterceptor('images', 9))
+  updateProduct(
+    @Param('id') id: string,
+    @Body() productFormDataDto: ProductFormDataDto,
+    @UploadedFiles() files : Express.Multer.File[]) {
+      console.log('files', productFormDataDto);
+    const updateProductDto = ProductMapper.toCreateProductDto(productFormDataDto, []);
+    return this.productsService.updateProduct(id, updateProductDto, files);
   }
 
   @Roles('admin')

@@ -24,6 +24,7 @@ import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AddressesModule } from './addresses/addresses.module';
 import { RolesGuard } from './common/guards/roles.gaurds';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -53,7 +54,8 @@ import { RolesGuard } from './common/guards/roles.gaurds';
     WishlistsModule,
     NotificationsModule,
     UsersModule,
-    AddressesModule
+    AddressesModule,
+    UploadModule
   ],
   controllers: [AppController],
   providers: [
