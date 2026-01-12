@@ -30,7 +30,7 @@ export class UploadController {
   }
 
   @Post('images')
-  @UseInterceptors(FilesInterceptor('files', 10)) // Max 10 images
+  @UseInterceptors(FilesInterceptor('files', 10))
   async uploadMultipleImages(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files uploaded');

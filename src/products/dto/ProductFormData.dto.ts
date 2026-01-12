@@ -1,25 +1,22 @@
-import {
-  IsString,
-  IsOptional,
-  IsUUID,
-  IsNumberString,
-  IsBooleanString,
-} from 'class-validator';
+import { IsBooleanString, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 
-export class CreateProductFormDataDto {
+export class ProductFormDataDto {
+  @IsNotEmpty()
   @IsString()
   name: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   description?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   shortDescription?: string;
 
-  // 💰 Prices
   @IsNumberString()
+  @IsNotEmpty()
   price: string;
 
   @IsOptional()
@@ -30,7 +27,10 @@ export class CreateProductFormDataDto {
   @IsNumberString()
   costPrice?: string;
 
-  // 📦 Stock
+  @IsOptional()
+  @IsString()
+  imagesMeta?: string;
+
   @IsOptional()
   @IsString()
   sku?: string;

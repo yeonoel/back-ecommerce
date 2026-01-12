@@ -1,20 +1,22 @@
 import { CreateProductDto } from '../dto/create-product.dto';
 import { CreateProductsImageDto } from '../../products-images/dto/create-products-image.dto';
 import { CreateProductVariantDto } from '../../product-variants/dto/create-product-variant.dto';
-import { CreateProductFormDataDto } from '../dto/CreateProductFormDataDto';
+import { ProductFormDataDto } from '../dto/ProductFormData.dto';
+import { ImagesMetaDto } from '../dto/images-meta.dto';
 
 export class ProductMapper {
-  static toCreateProductDto(form: CreateProductFormDataDto, imageUrls: string[]): CreateProductDto {
-    const images: CreateProductsImageDto[] = imageUrls.map((url, index) => ({
-      imageUrl: url,
-      isPrimary: index === 0,
-      displayOrder: index,
-    }));
+  static toCreateProductDto(form: ProductFormDataDto, imageUrls: string[]): CreateProductDto {
+    const images: CreateProductsImageDto[] = [];
     let variants: CreateProductVariantDto[] | undefined;
     if (form.variants) {
       variants = JSON.parse(form.variants);
     }
+    let imagesMeta: ImagesMetaDto[] = [];
+    if (form.imagesMeta) {
+      imagesMeta = JSON.parse(form.imagesMeta);
+    }
 
+    console.log('imagesMeta', imagesMeta);
     return {
       name: form.name,
       description: form.description,
@@ -36,6 +38,7 @@ export class ProductMapper {
       height: form.height ? Number(form.height) : undefined,
       images,
       variants,
+      imagesMeta
     };
   }
 }
