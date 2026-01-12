@@ -1,16 +1,4 @@
-// src/products/dto/create-product.dto.ts
-import {
-  IsString,
-  IsOptional,
-  IsNumber,
-  IsBoolean,
-  IsUUID,
-  IsArray,
-  Min,
-  MaxLength,
-  ValidateNested,
-  IsPositive,
-} from 'class-validator';
+import { IsArray, isArray, IsBoolean, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateProductVariantDto } from '../../product-variants/dto/create-product-variant.dto';
 import { CreateProductsImageDto } from '../../products-images/dto/create-products-image.dto';

@@ -38,12 +38,12 @@ export class Cart {
   @Column({ name: 'coupon_code', length: 50, nullable: true })
   couponCode?: string;
 
+  @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
+  expiresAt?: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
-  expiresAt?: Date;
 }

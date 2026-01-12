@@ -1,21 +1,12 @@
-// src/product-images/dto/create-product-image.dto.ts
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsNumber,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Min } from 'class-validator';
 
 export class CreateProductsImageDto {
+  @IsUrl()
   @IsString()
-  @MaxLength(500)
   imageUrl: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
   altText?: string;
 
   @IsOptional()

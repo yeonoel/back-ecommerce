@@ -76,13 +76,11 @@ export class ProductsService {
 
       if (createDto.variants?.length) {
         this.checkDuplicateVariants(createDto.variants);
-
         for (const variant of createDto.variants) {
           let variantSku = variant.sku;
           if (!variantSku) {
             variantSku = generateVariantSku(product.sku, variant);
           }
-
           if (variantSku) {
             const variantSkuExists = await manager.findOne(ProductVariant, {
               where: { sku: variantSku },
@@ -94,7 +92,6 @@ export class ProductsService {
               );
             }
           }
-
           await manager.save(ProductVariant, {
             product,
             name: variant.name,
@@ -327,16 +324,13 @@ export class ProductsService {
    */
   private normalizeImages(images: CreateProductsImageDto[]) {
     let primaryFound = false;
-
     const normalized = images.map((img) => {
       if (img.isPrimary && !primaryFound) {
         primaryFound = true;
         return { ...img, isPrimary: true };
       }
-
       return { ...img, isPrimary: false };
     });
-
     if (!primaryFound && normalized.length > 0) {
       normalized[0].isPrimary = true;
     }
@@ -350,7 +344,6 @@ export class ProductsService {
    */
   private checkDuplicateVariants(variants: CreateProductVariantDto[]): void {
     const set = new Set<string>();
-
     for (const variant of variants) {
       const key = `${variant.name}-${variant.color ?? ''}-${variant.size ?? ''}`;
 
@@ -358,7 +351,6 @@ export class ProductsService {
         throw new ConflictException(`Duplicate variant detected (color: ${variant.color}, size: ${variant.size})`,
         );
       }
-
       set.add(key);
     }
   }
