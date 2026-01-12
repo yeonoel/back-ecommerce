@@ -1,34 +1,31 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body,  Param, Delete, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { ProductsImagesService } from './products-images.service';
-import { CreateProductsImageDto } from './dto/create-products-image.dto';
-import { UpdateProductsImageDto } from './dto/update-products-image.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ImagesMetaDto } from '../products/dto/images-meta.dto';
+import { ImagesMetaFormDto } from './dto/image-meta-form.dto';
 
 @Controller('products-images')
 export class ProductsImagesController {
   constructor(private readonly productsImagesService: ProductsImagesService) {}
 
   @Post()
-  create(@Body() createProductsImageDto: CreateProductsImageDto) {
-    return this.productsImagesService.create(createProductsImageDto);
-  }
+@UseInterceptors(FilesInterceptor('images', 10))
+async uploadImages(
+  @Param('productId') productId: string,
+  @UploadedFiles() files: Express.Multer.File[],
+  @Body() meta?: ImagesMetaFormDto[],
+) {
+  return this.productsImagesService.createMany(productId, files, meta);
+}
+
 
   @Get()
-  findAll() {
-    return this.productsImagesService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsImagesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductsImageDto: UpdateProductsImageDto) {
-    return this.productsImagesService.update(+id, updateProductsImageDto);
+  async findAll(@Param('productId') productId: string) {
+    return this.productsImagesService.findAll(productId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsImagesService.remove(+id);
+  async remove(@Param('id') id: string) {
+    await this.productsImagesService.remove(id);
   }
 }
