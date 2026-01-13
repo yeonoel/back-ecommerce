@@ -5,7 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { ProductFiltersDto } from './dto/product-filters-dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ProductFormDataDto } from './dto/ProductFormData.dto';
-import { ProductMapper } from './mapper/ProductMapper';
+import { ProductMapper } from './mapper/product-mapper';
 
 @ApiTags('Products')
 @Controller('products')
