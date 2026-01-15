@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthResponseDto } from './dto/Users-response';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
+import { CartsService } from 'src/carts/carts.service';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +18,8 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private UsersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly cartService: CartsService
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -29,7 +31,14 @@ export class AuthService {
 
     return user
   }
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+
+  /**
+   * Enregistrer un nouvel utilisateur
+   * @param registerDto 
+   * @param sessionId 
+   * @returns 
+   */
+  async register(registerDto: RegisterDto, sessionId: string): Promise<AuthResponseDto> {
     const user = await this.userRepository.findOne({where: {email: registerDto.email}});
     if (user) {
       throw new ConflictException('email already exists');
@@ -52,21 +61,30 @@ export class AuthService {
       isActive: true,
       emailVerified: false,
     });
-
-    return this.login(newUser);
+    return this.login(newUser, sessionId);
   }
 
-  async login(user: User): Promise<AuthResponseDto> {
+
+  /**
+   * Connecter un utilisateur
+   * @param user 
+   * @param sessionId 
+   * @returns 
+   */
+  async login(user: User, sessionId: string): Promise<AuthResponseDto> {
     user.lastLoginAt = new Date();
     await this.userRepository.save(user);
-    
     const payload = {
     sub: user.id,
     email: user.email,
     role: user.role
    }
-
    const token = this.jwtService.sign(payload);
+   try {
+    this.cartService.mergeGuestCartWithUserCart(user.id, sessionId);
+   } catch (error) {
+    console.error('failed to merge cart after login:', error);
+   }
 
    return this.buildAuthResponse(user, token);
   }  

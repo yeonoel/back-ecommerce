@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode, UseInterceptors, 
+  UploadedFiles } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ApiTags } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -6,6 +7,7 @@ import { ProductFiltersDto } from './dto/product-filters-dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ProductFormDataDto } from './dto/ProductFormData.dto';
 import { ProductMapper } from './mapper/product-mapper';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Products')
 @Controller('products')
@@ -23,6 +25,7 @@ export class ProductsController {
   }
 
   @Get()
+  @Public()
   findAllProducts(@Query() filters: ProductFiltersDto) {
     return this.productsService.findAllProducts(filters);
   }

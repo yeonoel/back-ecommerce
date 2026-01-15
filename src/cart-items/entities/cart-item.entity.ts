@@ -20,7 +20,7 @@ export class CartItem {
 
   @ManyToOne(() => ProductVariant, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'variant_id' })
-  variant?: ProductVariant;
+  variant: ProductVariant | null;
 
   @Column({ type: 'int', default: 1 })
   quantity: number;

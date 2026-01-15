@@ -10,10 +10,12 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersModule } from '../users/users.module';
+import { CartsModule } from '../carts/carts.module';
 
 @Module({
   imports: [
     UsersModule,
+    CartsModule,
     TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

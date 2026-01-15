@@ -4,7 +4,7 @@ export const BusinessConstants = {
    * TVA (Taxe sur la Valeur Ajoutée)
    */
   TAX: {
-    RATE: 0,
+    RATE: 0.20,
     LABEL: 'TVA (20%)',
   },
 

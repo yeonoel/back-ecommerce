@@ -12,13 +12,13 @@ export class Cart {
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user?: User;
+  user: User | null;
 
   @OneToMany(() => CartItem, cartItem => cartItem.cart)
   items: CartItem[];
 
-  @Column({ name: 'session_id', length: 255, nullable: true })
-  sessionId?: string;
+  @Column({ name: 'session_id', length: 255, nullable: true, type: 'varchar' })
+  sessionId: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   subtotal: number;
@@ -35,8 +35,8 @@ export class Cart {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   total: number;
 
-  @Column({ name: 'coupon_code', length: 50, nullable: true })
-  couponCode?: string;
+  @Column({ name: 'coupon_code', length: 50, nullable: true, type: 'varchar' })
+  couponCode: string | null;
 
   @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
   expiresAt?: Date;
