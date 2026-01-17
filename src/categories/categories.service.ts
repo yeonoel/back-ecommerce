@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Category } from './entities/category.entity';
 import slugify from 'slugify';
-import { ResponseDto } from '../common/dto/ResponseDto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { generateSlug } from 'src/common/utils/slug.util';
 
 @Injectable()

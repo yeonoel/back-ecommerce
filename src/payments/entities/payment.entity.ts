@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
+import { PaymentMethodType } from '../enums/payment-method-type.enum';
 
 @Entity('payments')
 @Index('idx_payments_order_id', ['order'])
@@ -18,13 +19,13 @@ export class Payment {
   @Column({ length: 3, default: 'EUR' })
   currency: string;
 
-  @Column({ length: 50 })
-  paymentMethod: string;
+  @Column({name: 'payment_method', type: 'enum', enum: PaymentMethodType, })
+  paymentMethod: PaymentMethodType;
 
-  @Column({ length: 50, nullable: true })
+  @Column({name: 'payment_provider', length: 50, nullable: true })
   paymentProvider?: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({name: 'transaction_id', length: 255, nullable: true })
   transactionId?: string;
 
   @Column({ length: 50, default: 'pending' })
