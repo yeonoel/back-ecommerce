@@ -1,5 +1,4 @@
 import { CreateOrderDto } from './dto/create-order.dto';
-import { UpdateOrderDto } from './dto/update-order.dto';
 import {Injectable, NotFoundException, BadRequestException, ForbiddenException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, Or } from 'typeorm';
@@ -26,24 +25,6 @@ export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
-    @InjectRepository(OrderItem)
-    private readonly orderItemsRepository: Repository<OrderItem>,
-    @InjectRepository(Cart)
-    private readonly cartsRepository: Repository<Cart>,
-    @InjectRepository(CartItem)
-    private readonly cartItemsRepository: Repository<CartItem>,
-    @InjectRepository(Product)
-    private readonly productsRepository: Repository<Product>,
-    @InjectRepository(ProductVariant)
-    private readonly productVariantsRepository: Repository<ProductVariant>,
-    @InjectRepository(Address)
-    private readonly addressesRepository: Repository<Address>,
-    @InjectRepository(Coupon)
-    private readonly couponsRepository: Repository<Coupon>,
-    @InjectRepository(CouponUsage)
-    private readonly couponUsageRepository: Repository<CouponUsage>,
-    @InjectRepository(Notification)
-    private readonly notificationsRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -92,7 +73,7 @@ export class OrdersService {
       const { shippingSnapshot, billingSnapshot, address } = await this.checkAdress(createOrderDto, userId, manager);
       const order = await manager.save(Order, {
         orderNumber,
-        userId,
+        user: { id: userId },
         status: OrderStatus.PENDING,
         paymentStatus: PaymentStatus.PENDING,
         subtotal: cart.subtotal,
@@ -113,9 +94,9 @@ export class OrdersService {
         const product = cartItem.product;
         const variant = cartItem.variant;
         await manager.save(OrderItem, {
-          orderId: order.id,
-          productId: product.id,
-          variantId: variant?.id,
+          order: { id: order.id },
+          product: { id: product?.id },
+          variant: { id: variant?.id },
           productName: product.name,
           productSku: product.sku, 
           variantName: variant?.name,
@@ -218,12 +199,12 @@ export class OrdersService {
    * @return Promise<OrderDto>
    */
   async getOrderById(userId: string, orderId: string): Promise<ResponseDto<OrderDto>> {
-    const order = await this.ordersRepository.findOne({where: { id: orderId }, relations: ['items', 'items.product']});
+    const order = await this.ordersRepository.findOne({where: { id: orderId }, relations: ['user', 'items', 'items.product']});
     if (!order) {
       throw new NotFoundException('Order not found');
     }
     if (order.user?.id !== userId) {
-        throw new ForbiddenException('You can only cancel your own orders');
+        throw new ForbiddenException('You can only retrieve your own orders');
       }
     return {
       success: true,
@@ -240,7 +221,7 @@ export class OrdersService {
    */
   async cancelOrder(userId: string, orderId: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items']});
+      const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items', 'user']});
       if (!order) {
         throw new NotFoundException('Order not found');
       }

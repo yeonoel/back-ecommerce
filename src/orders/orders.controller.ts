@@ -11,41 +11,48 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.gaurds';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from 'src/common/decorators/public.decorator';
 
+@ApiTags('Orders')
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a new order' })
   async createOrder(@CurrentUser() user: any,@Body() createOrderDto: CreateOrderDto): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.createOrder(user.id, createOrderDto);
+    return await this.ordersService.createOrder(user?.id, createOrderDto);
   }
 
-  @Get()
-  async getMyOrders(@CurrentUser() user: any, @Query() paginationDto: PaginationDto): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
-    return await this.ordersService.getUserOrders(user.id, paginationDto);
-  }
-
-  @Get(':id')
+  @Get('/get-order/:id')
   async getOrder(@CurrentUser() user: any, @Param('id') orderId: string,): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.getOrderById(user.id, orderId);
+    return await this.ordersService.getOrderById(user?.id, orderId);
   }
 
-  @Delete(':id')
+  @Delete('/cancel-order/:id')
+  @ApiOperation({ summary: 'Cancel an order' })
   @HttpCode(HttpStatus.OK)
   async cancelOrder(@CurrentUser() user: any, @Param('id') orderId: string,): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.cancelOrder(user.id, orderId);
+    return await this.ordersService.cancelOrder(user?.id, orderId);
   }
 
-  @Patch(':id/status')
+  @Get('/my-orders/all')
+  @ApiOperation({ summary: 'Get my orders (paginated)' })
+  async getMyOrders(@CurrentUser() user: any, @Query() paginationDto: PaginationDto): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+    return await this.ordersService.getUserOrders(user?.id, paginationDto);
+  }
+
+  @Patch('admin/orders/:id/status')
   @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Update order status (admin)' })
   @Roles('admin')
   async updateOrderStatus(@Param('id') orderId: string,@Body() updateStatusDto: UpdateOrderStatusDto): Promise<ResponseDto<OrderDto>> {
     return await this.ordersService.updateOrderStatus(orderId,updateStatusDto.status);
   }
 
-  @Get('admin/all')
+  @Get('admin/orders/all')
   @UseGuards(RolesGuard)
   @Roles('admin')
   async getAllOrders(@Query() paginationDto: PaginationDto): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {

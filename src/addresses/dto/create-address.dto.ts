@@ -1,4 +1,3 @@
-// src/addresses/dto/create-address.dto.ts
 import { IsEnum, IsOptional, IsString, MaxLength, IsBoolean } from 'class-validator';
 import { AddressType } from '../enums/address-type.enum';
 
