@@ -33,7 +33,7 @@ export class CartsService {
         where: { user: { id: userId } },
         relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
       });
-      if (cart) {
+      if (cart && cart.items.length > 0) {
         return mapToCartDto(cart);
       }
       const guestCart = await this.cartsRepository.findOne({

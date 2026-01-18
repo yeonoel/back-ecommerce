@@ -3,7 +3,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { UploadService } from 'src/upload/upload.service';
 import { Product } from '../products/entities/product.entity';
 import { ProductImage } from './entities/products-image.entity';
-import { ResponseDto } from '../common/dto/ResponseDto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { ImagesMetaFormDto } from './dto/image-meta-form.dto';
 import { ProductImageMapper } from '../products/mapper/product-images-mapper';
 

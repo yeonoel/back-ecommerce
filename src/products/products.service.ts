@@ -4,7 +4,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { DataSource, Repository } from 'typeorm';
-import { ResponseDto } from 'src/common/dto/ResponseDto';
+import { ResponseDto } from 'src/common/dto/responses/Response.dto';
 import { ProductImage } from 'src/products-images/entities/products-image.entity';
 import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
 import { generateSlug } from 'src/common/utils/slug.util';
