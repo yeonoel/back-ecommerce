@@ -379,7 +379,7 @@ export class CartsService {
     }
     return updatedCart;
   });
-}
+  }
 
   /**
    * Retirer un produit du panier

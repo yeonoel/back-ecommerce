@@ -1,7 +1,7 @@
 import { CreateOrderDto } from './dto/create-order.dto';
 import {Injectable, NotFoundException, BadRequestException, ForbiddenException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager, Or } from 'typeorm';
+import { Repository, DataSource, EntityManager, Or, LessThan } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { Cart } from '../carts/entities/cart.entity';
 import { CartItem } from '../cart-items/entities/cart-item.entity';
@@ -19,12 +19,15 @@ import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { OrderStatus } from './enums/order-status.enum';
 import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
+    @InjectRepository(Notification)
+    private readonly notificationsRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -54,19 +57,20 @@ export class OrdersService {
           if (!variant) {
             throw new NotFoundException(`Variant not found`);
           }
-          availableStock = variant.stockQuantity;
+          availableStock = variant.availabledQuantity;
           productName = `${cartItem.product.name} - ${variant.name}`;
         } else {
-          availableStock = cartItem.product.stockQuantity;
+          availableStock = cartItem.product.availabledQuantity;
           productName = cartItem.product.name;
         }
-
         if (availableStock < cartItem.quantity) {
           throw new BadRequestException(
             `Not enough stock for ${productName}. Available: ${availableStock}, Requested: ${cartItem.quantity}`,
           );
         }
       }
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 6060); // 15 minutes à partir de maintenant
       // générer un numéro de commande unique
       const orderNumber = await this.generateOrderNumber(manager);
       // Préparer les snapshots d'adresse
@@ -75,7 +79,7 @@ export class OrdersService {
         orderNumber,
         user: { id: userId },
         status: OrderStatus.PENDING,
-        paymentStatus: PaymentStatus.PENDING,
+        paymentStatus: PaymentStatus.PENDING_PAYMENT,
         subtotal: cart.subtotal,
         tax: cart.tax,
         shippingCost: cart.shippingCost,
@@ -84,6 +88,7 @@ export class OrdersService {
         couponCode: cart.couponCode,
         shippingAddress: address,
         billingAddress: address,
+        expiresAt,
         shippingAddressSnapshot: shippingSnapshot,
         billingAddressSnapshot: billingSnapshot,
         customerNote: createOrderDto.customerNote,
@@ -108,10 +113,10 @@ export class OrdersService {
       // décrémenter les stocks
       for (const cartItem of cart.items) {
         if (cartItem.variant?.id) {
-          await manager.decrement(ProductVariant, { id: cartItem.variant.id },'stockQuantity', cartItem.quantity);
+          await manager.increment(ProductVariant, { id: cartItem.variant.id },'reservedQuantity', cartItem.quantity);
         } else {
           // Stock géré par produit
-          await manager.decrement(Product,{ id: cartItem.product.id },'stockQuantity', cartItem.quantity);
+          await manager.increment(Product,{ id: cartItem.product.id },'availabledQuantity', cartItem.quantity);
         }
       }
       // gérer les coupon si appliqué
@@ -361,7 +366,8 @@ export class OrdersService {
       processing: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
       shipped: [OrderStatus.DELIVERED],
       delivered: [],
-      cancelled: [], 
+      cancelled: [],
+      expired: [],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -464,8 +470,113 @@ export class OrdersService {
         address: address,
       };
   }
+
+  /**
+ * Confirmer le paiement (appelé par webhook)
+ * @param orderId l'ID de la commande
+ * @returns Promise<OrderDto>
+ */
+async confirmPayment(orderId: string): Promise<OrderDto> {
+  return this.dataSource.transaction(async (manager) => {
+    const order = await manager.findOne(Order, {
+      where: { id: orderId },
+      relations: ['items', 'items.variant', 'items.product', 'user'],
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    // Convertir réservation en vente
+    for (const item of order.items) {
+      if (item.variant) {
+        // Décrémenter stock ET réservation
+        if (item.variant.stockQuantity < item.quantity) {
+          throw new BadRequestException('Not enough stock for some items');
+        }
+        await manager.decrement(ProductVariant,{ id: item.variant.id},'stockQuantity',item.quantity,);
+        await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
+      } else {
+        if (item.product.stockQuantity < item.quantity) {
+          throw new BadRequestException('Not enough stock for some items');
+        }
+        await manager.decrement(Product,{ id: item.product.id },'stockQuantity',item.quantity);
+        await manager.decrement(Product,{ id: item.product.id },'reservedQuantity',item.quantity,);
+      }
+    }
+    // Mettre à jour l'order
+    order.status = OrderStatus.CONFIRMED;
+    order.paymentStatus = PaymentStatus.PAID;
+    order.paidAt = new Date();
+    order.expiresAt = null;
+    await manager.save(Order, order);
+    //  on vide le panier
+    const cart = await manager.findOne(Cart, {
+      where: { user: { id: order.user.id }},
+    });
+
+    if (cart) {
+      await manager.delete(CartItem, { cartId: cart.id });
+      await manager.update(Cart,{ id: cart.id },
+        {
+          subtotal: 0,
+          tax: 0,
+          total: 0,
+          couponCode: null,
+        },
+      );
+    }
+
+    // notification
+    await manager.save(Notification, {
+      userId: order.user.id,
+      type: 'order_status',
+      title: 'Payment Confirmed',
+      message: `Your payment for order ${order.orderNumber} has been confirmed!`,
+      metadata: { orderId: order.id },
+    });
+    return mapToOrderDto(order);
+  });
 }
 
+/**
+ * Libérer le stock (échec paiement ou expiration)
+ */
+async releaseStock(orderId: string): Promise<void> {
+  return this.dataSource.transaction(async (manager) => {
+    const order = await manager.findOne(Order, {where: { id: orderId },relations: ['items', 'items.variant', 'items.product']});
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    for (const item of order.items) {
+      if (item.variant) {
+        await manager.decrement(ProductVariant,{ id: item.variant.id },'reservedQuantity',item.quantity);
+      } else {
+        await manager.decrement(Product,{ id: item.product.id },'reservedQuantity',item.quantity);
+      }
+    }
+  });
+}
 
- 
+/**
+ * Netoyer les reservations expirées (Cron job)
+ */
+@Cron('* * * * *') // Toutes les minutes
+async cleanupExpiredReservations() {
+  const expiredOrders = await this.ordersRepository.find({
+    where: {status: OrderStatus.PENDING,expiresAt: LessThan(new Date()),},
+    relations: ['user'],
+  });
 
+  for (const order of expiredOrders) {
+    await this.releaseStock(order.id);
+    order.status = OrderStatus.EXPIRED;
+    await this.ordersRepository.save(order);
+    // Notification
+    await this.notificationsRepository.save({
+      userId: order.user.id,
+      type: 'order_status',
+      title: 'Order Expired',
+      message: `Your order ${order.orderNumber} has expired. Please try again.`,
+      metadata: { orderId: order.id },
+    });
+  }}
+}

@@ -1,7 +1,7 @@
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Category } from '../../categories/entities/category.entity';
 import { ProductVariant } from '../../product-variants/entities/product-variant.entity';
 import { ProductImage } from '../../products-images/entities/products-image.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 
 
 @Entity('products')
@@ -44,6 +44,9 @@ export class Product {
 
   @Column({name: 'stock_quantity', default: 0 })
   stockQuantity: number;
+
+  @Column({name: 'reserved_quantity', default: 0 })
+  reservedQuantity: number;
 
   @Column({name: 'low_stock_threshold', default: 5 })
   lowStockThreshold: number;
@@ -101,6 +104,11 @@ export class Product {
   get isOutOfStock(): boolean {
     // Retourne true si le produit est en rupture de stock
     return this.stockQuantity === 0;
+  }
+
+  get availabledQuantity(): number {
+    // Calcule la quantité disponible
+    return this.stockQuantity - this.reservedQuantity;
   }
 }
 

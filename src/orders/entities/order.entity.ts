@@ -31,7 +31,7 @@ export class Order {
   @Column({ default: OrderStatus.PENDING, type: 'enum', enum: OrderStatus })
   status: OrderStatus;
 
-  @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
+  @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })
   paymentStatus: PaymentStatus;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
@@ -77,6 +77,9 @@ export class Order {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
+  expiresAt?: Date | null;
 
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt?: Date;
