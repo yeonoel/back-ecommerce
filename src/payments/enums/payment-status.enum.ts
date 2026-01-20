@@ -6,5 +6,6 @@ export enum PaymentStatus {
   SUCCEEDED = 'succeeded',    // paiement réussi
   FAILED = 'failed',          // paiement échoué
   CANCELLED = 'cancelled',    // annulé par le client / système
+  EXPIRED = 'expired',        // paiement expiré
   REFUNDED = 'refunded',      // remboursé
 }

@@ -1,35 +1,41 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Payment } from './entities/payment.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Order } from 'src/orders/entities/order.entity';
 import Stripe from 'stripe';
-import { stripeConfig } from 'src/config/stripe-config';
 import { PaymentStatus } from './enums/payment-status.enum';
 import { PaymentMethodType } from './enums/payment-method-type.enum';
 import { currencyTypes } from '../common/enums/currency-type.enum';
+import { ResponseDto } from 'src/common/dto/responses/Response.dto';
+import { PaymentResponseDto } from './dto/responses/payment-response.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   private stripe: Stripe;
   constructor(
         @InjectRepository(Payment)
         private readonly paymentsRepository: Repository<Payment>,
         @InjectRepository(Order)
         private readonly ordersRepository: Repository<Order>,
+        private readonly configService: ConfigService
   ) {
-    this.stripe = new Stripe(stripeConfig.apiKey, {
-      apiVersion: '2025-12-15.clover' 
-    });
+    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (!secretKey) {
+      throw new Error('Stripe secret key not found');
+    }
+    this.stripe = new Stripe(secretKey);
   }
+  
    /**
    * créer un Payment Intent Stripe pour une commande
    * @param orderId l'ID de la commande
    * @param userId l'ID de l'utilisateur
    * 
    */
-  async createPaymentIntent(orderId: string, userId: string): Promise<{ clientSecret: string; paymentId: string }> {
-    // Récupérer la commande
+  async createPaymentIntent(orderId: string, userId: string): Promise<ResponseDto<PaymentResponseDto>>  {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId, user: { id: userId } },
     });
@@ -49,7 +55,7 @@ export class PaymentsService {
         user_id: userId,
       },
       automatic_payment_methods: {
-        enabled: true, // Permet CB, Google Pay, Apple Pay, etc.
+        enabled: true,
       },
     });
     if (!paymentIntent.client_secret) {
@@ -72,9 +78,13 @@ export class PaymentsService {
 
     // Retourner le client_secret pour le frontend
     return {
-      clientSecret: paymentIntent.client_secret,
-      paymentId: payment.id,
-    };
+      success: true,
+      message: 'Payment intent created successfully',
+      data: {
+        clientSecret: paymentIntent.client_secret,
+        paymentId: payment.id,
+      },
+    }
   }
 
   /**
@@ -84,11 +94,15 @@ export class PaymentsService {
    * @return l'événement Stripe validé
    */
   verifyWebhook(rawBody: Buffer, signature: string): Stripe.Event {
+    const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      throw new Error('Stripe webhook secret not found');
+    }
     try {
       return this.stripe.webhooks.constructEvent(
         rawBody,
         signature,
-        stripeConfig.webhookSecret,
+        webhookSecret,
       );
     } catch (error) {
       throw new BadRequestException(`Webhook signature verification failed: ${error.message}`);
@@ -101,12 +115,9 @@ export class PaymentsService {
    */
   async handlePaymentSuccess(paymentIntentId: string): Promise<Order | void> {
     // Sera appelé par le webhook controller
-    const payment = await this.paymentsRepository.findOne({
-      where: { transactionId: paymentIntentId },
-      relations: ['order'],
-    });
+    const payment = await this.paymentsRepository.findOne({where: { transactionId: paymentIntentId },relations: ['order']});
     if (!payment) {
-      console.error(`Payment not found for intent: ${paymentIntentId}`);
+      this.logger.warn(`Payment not found for intent: ${paymentIntentId}`);
       return;
     }
     // Mettre à jour le payment
@@ -120,12 +131,10 @@ export class PaymentsService {
    * @param paymentIntentId l'ID du Payment Intent Stripe
    */
   async handlePaymentFailed(paymentIntentId: string): Promise<Order | void> {
-    const payment = await this.paymentsRepository.findOne({
-      where: { transactionId: paymentIntentId },
-      relations: ['order'],
-    });
+    const payment = await this.paymentsRepository.findOne({where: { transactionId: paymentIntentId },relations: ['order']});
     if (!payment) {
-      throw new NotFoundException(`Payment not found for intent: ${paymentIntentId}`);
+      this.logger.warn(`Payment not found for intent: ${paymentIntentId}`);
+      return;
     }
     payment.status = PaymentStatus.FAILED;
     await this.paymentsRepository.save(payment);

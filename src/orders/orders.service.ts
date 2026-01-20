@@ -70,7 +70,7 @@ export class OrdersService {
         }
       }
       const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 6060); // 15 minutes à partir de maintenant
+      expiresAt.setMinutes(expiresAt.getMinutes() + 60); // 60 minutes à partir de maintenant
       // générer un numéro de commande unique
       const orderNumber = await this.generateOrderNumber(manager);
       // Préparer les snapshots d'adresse
@@ -78,7 +78,7 @@ export class OrdersService {
       const order = await manager.save(Order, {
         orderNumber,
         user: { id: userId },
-        status: OrderStatus.PENDING,
+        status: OrderStatus.PENDING_PAYMENT,
         paymentStatus: PaymentStatus.PENDING_PAYMENT,
         subtotal: cart.subtotal,
         tax: cart.tax,
@@ -88,11 +88,11 @@ export class OrdersService {
         couponCode: cart.couponCode,
         shippingAddress: address,
         billingAddress: address,
-        expiresAt,
         shippingAddressSnapshot: shippingSnapshot,
         billingAddressSnapshot: billingSnapshot,
         customerNote: createOrderDto.customerNote,
         paymentMethod: createOrderDto.paymentMethod,
+        expiresAt,
       });
       // creer les orders items (Snapshot des produits)
       for (const cartItem of cart.items) {
@@ -235,7 +235,7 @@ export class OrdersService {
         throw new ForbiddenException('You can only cancel your own orders');
       }
       // Vérifier que la commande peut être annulée
-      if (![OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(order.status)) {
+      if (![OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED].includes(order.status)) {
         throw new BadRequestException(
           `Cannot cancel order with status: ${order.status}`,
         );
@@ -361,13 +361,14 @@ export class OrdersService {
    */
   private validateStatusTransition(currentStatus: OrderStatus,newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      pending_payment: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
       confirmed: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
       processing: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
       shipped: [OrderStatus.DELIVERED],
       delivered: [],
       cancelled: [],
       expired: [],
+      payment_failed: [],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -378,38 +379,12 @@ export class OrdersService {
   }
 
   /**
-   * restaurer le stock des produits d'une commande en cas de commande annulée
-   * @param orderItems les items de la commande
-   * @param manager entité manager
-   * @return
-   */
-  private async restoreStock(orderItems: OrderItem[], manager: any): Promise<void> {
-    for (const item of orderItems) {
-      if (item.variant?.id) {
-        await manager.increment(
-          ProductVariant,
-          { id: item.variant.id },
-          'stockQuantity',
-          item.quantity,
-        );
-      } else {
-        await manager.increment(
-          Product,
-          { id: item.product.id },
-          'stockQuantity',
-          item.quantity,
-        );
-      }
-    }
-  }
-
-  /**
    * formater le statut pour l'affichage dans la notification
    * @param status statut de la commande
    */
   private formatStatus(status: string): string {
     const statusMap: { [key: string]: string } = {
-      pending: OrderStatus.PENDING,
+      pending_payment: OrderStatus.PENDING_PAYMENT,
       confirmed: OrderStatus.CONFIRMED,
       processing: OrderStatus.PROCESSING,
       shipped: OrderStatus.SHIPPED,
@@ -469,6 +444,21 @@ export class OrdersService {
         billingSnapshot: snapshot,
         address: address,
       };
+  }
+
+    /**
+   * restaurer le stock des produits d'une commande en cas de commande annulée
+   * @param orderItems les items de la commande
+   * @param manager entité manager
+   * @return
+   */
+  private async restoreStock(orderItems: OrderItem[], manager: any): Promise<void> {
+    for (const item of orderItems) {
+      if (item.variant?.id) {await manager.increment( ProductVariant,{ id: item.variant.id },'stockQuantity', item.quantity);
+      } else {
+        await manager.increment(Product,{ id: item.product.id }, 'stockQuantity',item.quantity);
+      }
+    }
   }
 
   /**
@@ -537,8 +527,85 @@ async confirmPayment(orderId: string): Promise<OrderDto> {
   });
 }
 
+ /**
+ * Confirmer le paiement (appelé par webhook)
+ * @param orderId l'ID de la commande
+ * @returns Promise<OrderDto>
+ */
+async FailedPayment(orderId: string): Promise<OrderDto> {
+  return this.dataSource.transaction(async (manager) => {
+    const order = await manager.findOne(Order, {
+      where: { id: orderId },
+      relations: ['items', 'items.variant', 'items.product', 'user'],
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    // Mettre à jour l'order
+    order.status = OrderStatus.PAYMENT_FAILED;
+    order.paymentStatus = PaymentStatus.FAILED;
+    order.cancelledAt = new Date();
+    order.expiresAt = null;
+    await manager.save(Order, order);
+        // Liberer le stock reservedQuantity
+    await this.releaseStock(order.id);
+    // notification
+    try {
+      await manager.save(Notification, {
+        userId: order.user.id,
+        type: 'order_status',
+        title: 'Payment Failed',
+        message: `Your payment for order ${order.orderNumber} has failed!`,
+        metadata: { orderId: order.id },
+      });
+    } catch (err) {
+      console.error('Notification failed', err);
+    }
+    return mapToOrderDto(order);
+  });
+}
+
+/**
+ * Confirmer le paiement (appelé par webhook)
+ * @param orderId l'ID de la commande
+ * @returns Promise<OrderDto>
+ */
+async cancelPayment(orderId: string): Promise<OrderDto> {
+  return this.dataSource.transaction(async (manager) => {
+    const order = await manager.findOne(Order, {
+      where: { id: orderId },
+      relations: ['items', 'items.variant', 'items.product', 'user'],
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    // Mettre à jour l'order
+    order.status = OrderStatus.CANCELLED;
+    order.paymentStatus = PaymentStatus.CANCELLED;
+    order.cancelledAt = new Date();
+    order.expiresAt = null;
+    await manager.save(Order, order);
+    // Liberer le stock reservedQuantity
+    await this.releaseStock(order.id);
+    // notification
+    try {
+      await manager.save(Notification, {
+        userId: order.user.id,
+        type: 'order_status',
+        title: 'Payment Failed',
+        message: `Your payment for order ${order.orderNumber} has been cancelled!`,
+        metadata: { orderId: order.id },
+      });
+    } catch (err) {
+      console.error('Notification failed', err);
+    }
+    return mapToOrderDto(order);
+  });
+}
+
 /**
  * Libérer le stock (échec paiement ou expiration)
+ * @param orderId l'ID de la commande
  */
 async releaseStock(orderId: string): Promise<void> {
   return this.dataSource.transaction(async (manager) => {
@@ -562,14 +629,12 @@ async releaseStock(orderId: string): Promise<void> {
 @Cron('* * * * *') // Toutes les minutes
 async cleanupExpiredReservations() {
   const expiredOrders = await this.ordersRepository.find({
-    where: {status: OrderStatus.PENDING,expiresAt: LessThan(new Date()),},
-    relations: ['user'],
-  });
-
+    where: {status: OrderStatus.PENDING_PAYMENT, expiresAt: LessThan(new Date()),},relations: ['user']});
   for (const order of expiredOrders) {
-    await this.releaseStock(order.id);
     order.status = OrderStatus.EXPIRED;
+    order.paymentStatus = PaymentStatus.EXPIRED;
     await this.ordersRepository.save(order);
+    await this.releaseStock(order.id);
     // Notification
     await this.notificationsRepository.save({
       userId: order.user.id,

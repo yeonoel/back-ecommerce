@@ -28,7 +28,7 @@ export class Order {
   @OneToMany(() => OrderItem, orderItem => orderItem.order)
   items: OrderItem[];
 
-  @Column({ default: OrderStatus.PENDING, type: 'enum', enum: OrderStatus })
+  @Column({ default: OrderStatus.PENDING_PAYMENT, type: 'enum', enum: OrderStatus })
   status: OrderStatus;
 
   @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })
