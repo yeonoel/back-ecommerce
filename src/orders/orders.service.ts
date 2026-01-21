@@ -119,16 +119,6 @@ export class OrdersService {
           await manager.increment(Product,{ id: cartItem.product.id },'availabledQuantity', cartItem.quantity);
         }
       }
-      // gérer les coupon si appliqué
-      if (cart.couponCode) {
-        const coupon = await manager.findOne(Coupon, {where: { code: cart.couponCode }});
-        if (coupon) {
-          // Incrémenter usage_count
-          await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
-          // Créer coupon_usage
-          await manager.save(CouponUsage, {couponId: coupon.id, userId, orderId: order.id, discountAmount: cart.discountAmount});
-        }
-      }
       // vider le panier
       await manager.delete(CartItem, { cart: { id: cart.id } });
       await manager.update(Cart,{ id: cart.id },
@@ -499,11 +489,19 @@ async confirmPayment(orderId: string): Promise<OrderDto> {
     order.expiresAt = null;
     await manager.save(Order, order);
     //  on vide le panier
-    const cart = await manager.findOne(Cart, {
-      where: { user: { id: order.user.id }},
-    });
+    const cart = await manager.findOne(Cart, {where: { user: { id: order.user.id }}});
 
     if (cart) {
+      // gérer les coupon si appliqué
+      if (cart.couponCode) {
+        const coupon = await manager.findOne(Coupon, {where: { code: cart.couponCode }});
+        if (coupon) {
+          // Incrémenter usage_count
+          await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
+          // Créer coupon_usage
+          await manager.save(CouponUsage, {couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount});
+        }
+      }
       await manager.delete(CartItem, { cartId: cart.id });
       await manager.update(Cart,{ id: cart.id },
         {

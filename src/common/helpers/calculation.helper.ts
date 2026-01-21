@@ -23,8 +23,12 @@ export class CalculationHelper {
   /**
    * Appliquer une réduction
    */
-  static applyDiscount(amount: number, discountPercentage: number): number {
+  static applyDiscountPercentage(amount: number, discountPercentage: number): number {
     return (amount * discountPercentage) / 100;
+  }
+
+  static applyDiscountFixedAmount(amount: number, discountFixedAmount: number): number {
+    return amount - discountFixedAmount;
   }
 
   static calculateSubtotal(items: CartItem[]): number {
@@ -44,7 +48,11 @@ export class CalculationHelper {
     return this.roundToTwoDecimals(subtotal + tax + shippingCost - discountAmount);
   }
 
-  static returnMinValue(discountValue: number, subtotal: number): number {
+  static min(discountValue: number, subtotal: number): number {
     return Math.min(discountValue, subtotal);
+  }
+
+  static max(discountValue: number, subtotal: number): number {
+    return Math.max(discountValue, subtotal);
   }
 }

@@ -10,6 +10,6 @@ export class PaymentsController {
 
 @Post('create-intent/:orderId')
   createPaymentIntent(@Param('orderId') orderId: string, @CurrentUser() user: any) : Promise<ResponseDto<PaymentResponseDto>> {
-    return this.paymentsService.createPaymentIntent(orderId, user?.id,);
+    return this.paymentsService.createPaymentIntent(orderId, user?.id);
   }
 }
