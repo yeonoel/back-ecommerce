@@ -489,7 +489,6 @@ export class CartsService {
       if (!updatedCart) {
         throw new NotFoundException('Cart not found after update');
       }
-
       return mapToCartDto(updatedCart);
     });
   }
@@ -538,17 +537,18 @@ export class CartsService {
     // Le coupon est ajouté lorsque le client renseigne le champ code promo depuis le frontend dans le panier
     // ce dernier est verifié et stocké dans le champ couponCode de la table carts.
     let discountAmount = 0;
+    let subTotalAfterDiscount = subtotal;
     if (cart.couponCode) {
       const coupon = await manager.findOne(Coupon, {where: { code: cart.couponCode }});
       if (coupon) {
         discountAmount = this.couponsService.calculateDiscount(coupon, subtotal);
       }
-      subtotal -= discountAmount;
+      subTotalAfterDiscount -= discountAmount;
     }
     // Calculer le total
     const total = CalculationHelper.calculateCartTotal(subtotal, tax, shippingCost, discountAmount);
     // Mettre à jour le panier
-    cart.subtotal = CalculationHelper.roundToTwoDecimals(subtotal);
+    cart.subtotal = CalculationHelper.roundToTwoDecimals(subTotalAfterDiscount);
     cart.tax = CalculationHelper.roundToTwoDecimals(tax);
     cart.shippingCost = CalculationHelper.roundToTwoDecimals(shippingCost);
     cart.discountAmount = CalculationHelper.roundToTwoDecimals(discountAmount);
