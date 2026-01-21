@@ -9,7 +9,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateApproveStatusDto } from './dto/update-approve-status.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
-@Controller('api/v1')
+@Controller('reviews')
 @UseGuards(JwtAuthGuard)
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
@@ -61,9 +61,8 @@ export class ReviewsController {
   }
 
   @Patch('admin/reviews/:id/approve')
-  @UseGuards(RolesGuard)
   @Roles('admin')
-  async approveReview(@Body() updateReview: UpdateApproveStatusDto) {
-    return this.reviewsService.updateApprovalStatus(updateReview);
+  async approveReview(@Param('id') id: string, @Body() body: UpdateApproveStatusDto) {
+    return this.reviewsService.updateApprovalStatus(id, body.isApproved);
   }
 }

@@ -163,19 +163,19 @@ export class ReviewsService {
   /**
    * Approuver un avis
    * @param id id de l'avis
-   * @param updateReviewDto dto
+   * @param isApproved 
    * @return ResponseDto
    */
- async updateApprovalStatus(updateReviewDto: UpdateApproveStatusDto): Promise<ResponseDto<Review>> {
-  const review = await this.reviewRepository.findOne({ where: { id: updateReviewDto.reviewId } });
+ async updateApprovalStatus(id: string, isApproved: boolean): Promise<ResponseDto<Review>> {
+  const review = await this.reviewRepository.findOne({ where: { id } });
   if (!review) {
     throw new NotFoundException('Review not found');
   }
-  review.isApproved = updateReviewDto.isApproved;
+  review.isApproved = isApproved;
   await this.reviewRepository.save(review);
   return {
     success: true,
-    message: updateReviewDto.isApproved ? 'Review approved successfully' : 'Review rejected successfully',
+    message: isApproved ? 'Review approved successfully' : 'Review rejected successfully',
     data: review,
   };
 }
