@@ -1,18 +1,11 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-  OneToMany,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Address } from '../../addresses/entities/address.entity';
 import { OrderItem } from '../../order-items/entities/order-item.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 import { User } from '../../users/entities/user.entity';
+import { OrderStatus } from '../enums/order-status.enum';
+import { PaymentStatus } from '../../payments/enums/payment-status.enum';
+import { Shipment } from '../../shipments/entities/shipment.entity';
 
 @Entity('orders')
 @Index('idx_orders_order_number', ['orderNumber'])
@@ -33,14 +26,17 @@ export class Order {
   @OneToMany(() => Payment, payment => payment.order)
   payments: Payment[];
 
+  @OneToMany(() => Shipment, shipment => shipment.order)
+  shipments: Shipment[];
+
   @OneToMany(() => OrderItem, orderItem => orderItem.order)
   items: OrderItem[];
 
-  @Column({ length: 50, default: 'pending' })
-  status: string;
+  @Column({ default: OrderStatus.PENDING_PAYMENT, type: 'enum', enum: OrderStatus })
+  status: OrderStatus;
 
-  @Column({ name: 'payment_status', length: 50, default: 'pending' })
-  paymentStatus: string;
+  @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })
+  paymentStatus: PaymentStatus;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   subtotal: number;
@@ -57,8 +53,8 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total: number;
 
-  @Column({ name: 'coupon_code', length: 50, nullable: true })
-  couponCode?: string;
+  @Column({ name: 'coupon_code', length: 50, nullable: true, type: 'varchar' })
+  couponCode?: string | null;
 
   @ManyToOne(() => Address, { nullable: true })
   @JoinColumn({ name: 'shipping_address_id' })
@@ -85,6 +81,9 @@ export class Order {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
+  expiresAt?: Date | null;
 
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt?: Date;

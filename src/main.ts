@@ -8,7 +8,7 @@ import cookieParser from 'cookie-parser';
 async function bootstrap() {
     console.log(process.env.NODE_ENV);
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {rawBody: true});
   app.use(cookieParser());
   const port = process.env.PORT || 3000;
 
@@ -55,6 +55,6 @@ async function bootstrap() {
   }
 
   await app.listen(port);
-  console.log(`✅ API listening on http://localhost:${port}/api`);
+  console.log(`API listening on http://localhost:${port}/api`);
 }
 bootstrap();

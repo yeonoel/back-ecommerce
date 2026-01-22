@@ -33,6 +33,9 @@ export class ProductVariant {
   @Column({ type: 'int', default: 0 })
   stockQuantity: number;
 
+  @Column({ name: 'reserved_quantity', type: 'int', default: 0 })
+  reservedQuantity: number;
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -41,4 +44,9 @@ export class ProductVariant {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  get availabledQuantity(): number {
+    // Calcule la quantité disponible
+    return this.stockQuantity - this.reservedQuantity;
+  }
 }

@@ -32,6 +32,7 @@
     "db:logs": "docker-compose logs -f postgres"
   },
   "dependencies": {
+    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -39,6 +40,7 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.11",
+    "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "^11.2.3",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^6.0.0",
@@ -48,6 +50,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "multer": "^2.0.2",
+    "nodemailer": "^7.0.12",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -56,6 +59,7 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
     "slugify": "^1.6.6",
+    "stripe": "^20.2.0",
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
@@ -70,6 +74,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.10.7",
+    "@types/stripe": "^8.0.416",
     "@types/supertest": "^6.0.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
