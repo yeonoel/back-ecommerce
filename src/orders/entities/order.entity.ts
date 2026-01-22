@@ -5,6 +5,7 @@ import { Payment } from '../../payments/entities/payment.entity';
 import { User } from '../../users/entities/user.entity';
 import { OrderStatus } from '../enums/order-status.enum';
 import { PaymentStatus } from '../../payments/enums/payment-status.enum';
+import { Shipment } from '../../shipments/entities/shipment.entity';
 
 @Entity('orders')
 @Index('idx_orders_order_number', ['orderNumber'])
@@ -24,6 +25,9 @@ export class Order {
 
   @OneToMany(() => Payment, payment => payment.order)
   payments: Payment[];
+
+  @OneToMany(() => Shipment, shipment => shipment.order)
+  shipments: Shipment[];
 
   @OneToMany(() => OrderItem, orderItem => orderItem.order)
   items: OrderItem[];

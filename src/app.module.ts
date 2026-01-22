@@ -26,6 +26,8 @@ import { AddressesModule } from './addresses/addresses.module';
 import { RolesGuard } from './common/guards/roles.gaurds';
 import { UploadModule } from './upload/upload.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ShipmentsModule } from './shipments/shipments.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -57,7 +59,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     UsersModule,
     AddressesModule,
     UploadModule,
-    WebhooksModule
+    WebhooksModule,
+    ShipmentsModule,
+    MailModule
   ],
   controllers: [AppController],
   providers: [
