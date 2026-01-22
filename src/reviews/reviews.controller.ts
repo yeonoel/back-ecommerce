@@ -8,6 +8,8 @@ import { RolesGuard } from '../common/guards/roles.gaurds';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateApproveStatusDto } from './dto/update-approve-status.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { User } from 'src/users/entities/user.entity';
 
 @Controller('reviews')
 @UseGuards(JwtAuthGuard)
@@ -28,7 +30,7 @@ export class ReviewsController {
   }
 
   @Get('products/:productId/reviews/can-review')
-  async canReview(@Param('productId') productId: string, @Req() req: any,) {
+  async canReview(@Param('productId') productId: string, @Req() req: any) {
     const userId = req.user.id;
     const canReview = await this.reviewsService.canUserReview(userId, productId);
     return { canReview };
@@ -40,16 +42,15 @@ export class ReviewsController {
   }
 
   @Patch('reviews/:id')
-  async updateReview( @Param('id') id: string, @Body() updateReviewDto: UpdateReviewDto, @Req() req: any) {
-    const userId = req.user.id;
-    return this.reviewsService.update(id, userId, updateReviewDto);
+  async updateReview( @Param('id') id: string, @Body() updateReviewDto: UpdateReviewDto, @CurrentUser() user: User) {
+    return this.reviewsService.update(id, user?.id, updateReviewDto);
   }
 
   @Delete('reviews/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteReview(@Param('id') id: string, @Req() req: any) {
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
+  async deleteReview(@Param('id') id: string, @CurrentUser() user: User) {
+    const userId = user?.id;
+    const isAdmin = user?.role === 'admin';
     return this.reviewsService.remove(id, userId, isAdmin);
   }
 
