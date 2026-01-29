@@ -11,6 +11,8 @@ import { CreateOrAddToCartDto } from './dto/create-or-add-cart.dto';
 import { mapToCartDto } from './mapper/map-to-cart-dto';
 import { BusinessConstants } from '../common/constants/businness.constant';
 import { CalculationHelper } from '../common/helpers/calculation.helper';
+import { CouponsService } from '../coupons/coupons.service';
+import { ValidateCouponResponseDto } from 'src/coupons/dto/responses/validate-coupon-response.dto';
 
 @Injectable()
 export class CartsService {
@@ -18,6 +20,7 @@ export class CartsService {
     @InjectRepository(Cart)
     private readonly cartsRepository: Repository<Cart>,
     private readonly dataSource: DataSource,
+    private readonly couponsService: CouponsService
   ) {}
 
   /**
@@ -33,7 +36,7 @@ export class CartsService {
         where: { user: { id: userId } },
         relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
       });
-      if (cart) {
+      if (cart && cart.items.length > 0) {
         return mapToCartDto(cart);
       }
       const guestCart = await this.cartsRepository.findOne({
@@ -379,7 +382,7 @@ export class CartsService {
     }
     return updatedCart;
   });
-}
+  }
 
   /**
    * Retirer un produit du panier
@@ -468,22 +471,11 @@ export class CartsService {
         throw new NotFoundException('Invalid or inactive coupon code');
       }
       // Valider le coupon
-      const now = new Date();
-      if (coupon.validFrom && now < coupon.validFrom) {
-        throw new BadRequestException('Coupon not yet valid');
+      const data: ValidateCouponResponseDto = 
+      await this.couponsService.validateCoupon({ code: coupon.code, cartSousTotal: cart.subtotal }, userId);
+      if (!data.isValid) {
+        throw new BadRequestException(data.message);
       }
-      if (coupon.validUntil && now > coupon.validUntil) {
-        throw new BadRequestException('Coupon has expired');
-      }
-      if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
-        throw new BadRequestException('Coupon usage limit reached');
-      }
-      // Vérifier montant minimum
-      if (coupon.minPurchaseAmount && cart.subtotal < coupon.minPurchaseAmount) {
-        throw new BadRequestException(`Minimum purchase amount is ${coupon.minPurchaseAmount}`);
-      }
-      // TODO: Vérifier usage_limit_per_user (nécessite table coupon_usage)
-
       // Appliquer le coupon
       cart.couponCode = coupon.code;
       await manager.save(Cart, cart);
@@ -497,7 +489,6 @@ export class CartsService {
       if (!updatedCart) {
         throw new NotFoundException('Cart not found after update');
       }
-
       return mapToCartDto(updatedCart);
     });
   }
@@ -537,32 +528,27 @@ export class CartsService {
   private async recalculateTotals(cartId: string, manager: any,): Promise<void> {
     const cart = await manager.findOne(Cart, {where: { id: cartId }, relations: ['items']});
     // Calculer le subtotal
-    const subtotal = cart.items.reduce((sum, item) => {return sum + item.price * item.quantity}, 0);
+    let subtotal = cart.items.reduce((sum, item) => {return sum + item.price * item.quantity}, 0);
     // Calculer la taxe (20% TVA)
     const tax = CalculationHelper.calculateTax(subtotal, BusinessConstants.TAX.RATE);
     const shippingCost = CalculationHelper.calculateShipping(subtotal);
     // Calculer la réduction si coupon
     // les coupons sont ajoutés dans la table coupons.
-    // Le coupon est ajouté lorsque le client renseigne le champ code promo depuis le frontend
+    // Le coupon est ajouté lorsque le client renseigne le champ code promo depuis le frontend dans le panier
     // ce dernier est verifié et stocké dans le champ couponCode de la table carts.
     let discountAmount = 0;
+    let subTotalAfterDiscount = subtotal;
     if (cart.couponCode) {
       const coupon = await manager.findOne(Coupon, {where: { code: cart.couponCode }});
       if (coupon) {
-        if (coupon.discountType === 'percentage') {
-          discountAmount =  CalculationHelper.applyDiscount(subtotal, coupon.discountValue);
-          if (coupon.maxDiscountAmount) {
-            discountAmount = CalculationHelper.returnMinValue(coupon.discountValue, subtotal);
-          }
-        } else {
-          discountAmount = CalculationHelper.returnMinValue(coupon.discountValue, subtotal);
-        }
+        discountAmount = this.couponsService.calculateDiscount(coupon, subtotal);
       }
+      subTotalAfterDiscount -= discountAmount;
     }
     // Calculer le total
     const total = CalculationHelper.calculateCartTotal(subtotal, tax, shippingCost, discountAmount);
     // Mettre à jour le panier
-    cart.subtotal = CalculationHelper.roundToTwoDecimals(subtotal);
+    cart.subtotal = CalculationHelper.roundToTwoDecimals(subTotalAfterDiscount);
     cart.tax = CalculationHelper.roundToTwoDecimals(tax);
     cart.shippingCost = CalculationHelper.roundToTwoDecimals(shippingCost);
     cart.discountAmount = CalculationHelper.roundToTwoDecimals(discountAmount);

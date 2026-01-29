@@ -1,5 +1,8 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
+import { PaymentMethodType } from '../enums/payment-method-type.enum';
+import { currencyTypes } from '../../common/enums/currency-type.enum';
+import { PaymentStatus } from '../enums/payment-status.enum';
 
 @Entity('payments')
 @Index('idx_payments_order_id', ['order'])
@@ -15,20 +18,20 @@ export class Payment {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
-  @Column({ length: 3, default: 'EUR' })
-  currency: string;
+  @Column({type: 'enum', enum: currencyTypes, default: currencyTypes.EUR })
+  currency: currencyTypes;
 
-  @Column({ length: 50 })
-  paymentMethod: string;
+  @Column({name: 'payment_method', type: 'enum', enum: PaymentMethodType, })
+  paymentMethod: PaymentMethodType;
 
-  @Column({ length: 50, nullable: true })
+  @Column({name: 'payment_provider', length: 50, nullable: true })
   paymentProvider?: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({name: 'transaction_id', length: 255, nullable: true })
   transactionId?: string;
 
-  @Column({ length: 50, default: 'pending' })
-  status: string;
+  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })
+  status: PaymentStatus;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;

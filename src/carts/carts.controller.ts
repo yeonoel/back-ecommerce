@@ -6,7 +6,7 @@ import { CreateOrAddToCartDto } from './dto/create-or-add-cart.dto';
 import { UpdateCartItemDto } from '../cart-items/dto/update-cart-item.dto';
 import { ApplyCouponDto } from './dto/apply-coupon.dto';
 import { CartDto } from './dto/responses/cart-dto';
-import { ResponseDto } from '../common/dto/ResponseDto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { OptionalAuthGuard } from '../common/guards/optional-auth.guard';
 import { SessionId } from '../common/decorators/session.decorator';
 import { Cart } from './entities/cart.entity';

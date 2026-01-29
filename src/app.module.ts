@@ -25,6 +25,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AddressesModule } from './addresses/addresses.module';
 import { RolesGuard } from './common/guards/roles.gaurds';
 import { UploadModule } from './upload/upload.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { ShipmentsModule } from './shipments/shipments.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -55,7 +58,10 @@ import { UploadModule } from './upload/upload.module';
     NotificationsModule,
     UsersModule,
     AddressesModule,
-    UploadModule
+    UploadModule,
+    WebhooksModule,
+    ShipmentsModule,
+    MailModule
   ],
   controllers: [AppController],
   providers: [

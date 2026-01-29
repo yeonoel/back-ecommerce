@@ -4,7 +4,7 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { DataSource, EntityManager } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
-import { ResponseDto } from '../common/dto/ResponseDto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 
 @Injectable()
 export class ProductVariantsService {
