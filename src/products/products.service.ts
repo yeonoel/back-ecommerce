@@ -20,7 +20,7 @@ import { UploadService } from '../upload/upload.service';
 export class ProductsService {
   constructor(
     @InjectRepository(Product)
-    private readonly productRepoisitory: Repository<Product>,
+    private readonly productRepository: Repository<Product>,
     private readonly dataSource: DataSource,
     private readonly uploadService: UploadService
   ) {}
@@ -130,7 +130,7 @@ export class ProductsService {
 
   async findAllProducts(filters: ProductFiltersDto): Promise<ResponseFilterDto> {
     const {category, minPrice, maxPrice, search, inStock, isFeatured, sortBy='createdAt', sortOrder='desc', page=1, limit=20} = filters;
-    const query = this.productRepoisitory
+    const query = this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.variants', 'variants');
@@ -177,7 +177,7 @@ export class ProductsService {
   }
 
   async findById(id: string): Promise<ResponseDto> {
-    const product = await this.productRepoisitory
+    const product = await this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect(
@@ -305,7 +305,7 @@ export class ProductsService {
 }
 
   async removeProduct(id: string): Promise<ResponseDto> {
-  const product = await this.productRepoisitory.findOne({
+  const product = await this.productRepository.findOne({
     where: { id },
     relations: ['images'],
   });
@@ -316,14 +316,13 @@ export class ProductsService {
       await this.uploadService.deleteImage(image.imageUrl);
     }
   }
-  await this.productRepoisitory.remove(product);
+  await this.productRepository.remove(product);
 
   return {
     success: true,
     message: 'Product deleted successfully',
   };
 }
-
 
   /**
    * RULES:

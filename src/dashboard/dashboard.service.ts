@@ -6,25 +6,26 @@ import { Order } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { OrderItem } from '../order-items/entities/order-item.entity';
-import { DashboardStatsDto, PercentageChangeDto, RevenueByMonthDto, TopProductDto, RecentOrderDto, LowStockProductDto } from './dto/dashboard-stat.dto';
+import { DashboardStatsDto, RevenueByMonthDto, TopProductDto, RecentOrderDto, LowStockProductDto } from './dto/dashboard-stat.dto';
 import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
 import { UserRole } from 'src/users/enum/userRole.enum';
 import { calculateChange } from 'src/helper/calculChange';
+import { LowStockProductsForProducstStats, OutOfStockProductDto, ProductStatsDto } from 'src/dashboard/dto/products-stats.dto';
+import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
 
 @Injectable()
 export class DashboardService {
   constructor(
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
-    
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
-    
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    
     @InjectRepository(OrderItem)
     private orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(ProductVariant)
+    private variantsRepository: Repository<ProductVariant>,
   ) {}
 
   async getStats(): Promise<DashboardStatsDto> {
@@ -84,6 +85,50 @@ export class DashboardService {
     };
   }
 
+  /**
+ * Statistiques des produits
+ * @returns 
+ */
+async getProductsStats(): Promise<ProductStatsDto> {
+    // Exécuter toutes les requêtes en parallèle pour optimiser
+    const [
+      totalProducts,
+      inventoryValue,
+      lowStockCount,
+      outOfStockCount,
+      lowStockProducts,
+      outOfStockProducts,
+      activeProducts,
+      inactiveProducts,
+      featuredProducts,
+      totalVariants,
+    ] = await Promise.all([
+      this.countTotalProducts(),
+      this.calculateInventoryValue(),
+      this.countLowStock(),
+      this.countOutOfStock(),
+      this.getLowStockProductsForProducstStats(),
+      this.getOutOfStockProducts(),
+      this.countActiveProducts(),
+      this.countInactiveProducts(),
+      this.countFeaturedProducts(),
+      this.countTotalVariants(),
+    ]);
+
+    return {
+      totalProducts,
+      inventoryValue,
+      lowStockCount,
+      outOfStockCount,
+      lowStockProducts,
+      outOfStockProducts,
+      activeProducts,
+      inactiveProducts,
+      featuredProducts,
+      totalVariants,
+    };
+}
+
 /**
  * Calcul du revenu total
  * @param startDate 
@@ -120,14 +165,13 @@ export class DashboardService {
       .orderBy("TO_CHAR(order.paidAt, 'YYYY-MM')", 'ASC')
       .getRawMany();
 
-    return results.map(r => ({
-      month: r.month,
-      revenue: parseFloat(r.revenue),
-      orders: parseInt(r.orders, 10),
-      label: this.formatMonthLabel(r.month),
+    return results.map(result => ({
+      month: result.month,
+      revenue: parseFloat(result.revenue),
+      orders: parseInt(result.orders, 10),
+      label: this.formatMonthLabel(result.month),
     }));
   }
-
 
   /**
    * Compte le nombre de commande
@@ -279,4 +323,136 @@ export class DashboardService {
     const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
   }
+
+/**
+ * Calculer le nombre total de produits en stock
+ * @returns 
+ */
+private async countTotalProducts(): Promise<number> {
+    return this.productRepository.count();
 }
+
+/**
+ * Calculer la valeur de l'inventaire (somme des prix des produits actifs * quantité en stock)
+ * @returns 
+ */
+private async calculateInventoryValue(): Promise<number> {
+    const result = await this.productRepository
+      .createQueryBuilder('product')
+      .select('SUM(product.price * product.stockQuantity)', 'totalValue')
+      .where('product.isActive = :isActive', { isActive: true })
+      .getRawOne();
+
+    return parseFloat(result?.totalValue || 0);
+  }
+
+/**
+ * Calculer le nombre de produits bientôt en rupture de stock
+ * @returns 
+ */
+  private async countLowStock(): Promise<number> {
+    return this.productRepository
+      .createQueryBuilder('product')
+      .where('product.stockQuantity > 0')
+      .andWhere('product.stockQuantity <= product.lowStockThreshold')
+      .getCount();
+  }
+
+  /**
+   * Calculer le nombre de produits qui ont une quantité en stock insuffisant
+   * @returns 
+   */
+  private async countOutOfStock(): Promise<number> {
+    return this.productRepository
+      .createQueryBuilder('product')
+      .where('product.stockQuantity = 0')
+      .getCount();
+  }
+
+  /**
+   * recuperer Produits bientot en rupture de stock
+   * @returns 
+   */
+  private async getLowStockProductsForProducstStats(): Promise<LowStockProductsForProducstStats[]> {
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('product.stockQuantity > 0')
+      .andWhere('product.stockQuantity <= product.lowStockThreshold')
+      .orderBy('product.stockQuantity', 'ASC')
+      .limit(10)
+      .getMany();
+
+    return products.map(product => ({
+      id: product.id,
+      name: product.name,
+      stockQuantity: product.stockQuantity,
+      lowStockThreshold: product.lowStockThreshold,
+      image: product.images?.find(img => img.isPrimary)?.imageUrl || product.images?.[0]?.imageUrl,
+      category: product.category?.name,
+    }));
+  }
+
+  /**
+   * recuperer Produits qui ont une quantité en stock insuffisant
+   * @returns 
+   */
+  private async getOutOfStockProducts(): Promise<OutOfStockProductDto[]> {
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('product.stockQuantity = 0')
+      .orderBy('product.updatedAt', 'DESC')
+      .limit(10)
+      .getMany();
+
+    return products.map(product => ({
+      id: product.id,
+      name: product.name,
+      category: product.category?.name,
+      image: product.images?.find(img => img.isPrimary)?.imageUrl || product.images?.[0]?.imageUrl,
+    }));
+  }
+
+  /**
+   * Calculer le nombre de produits actifs
+   * @returns 
+   */
+  private async countActiveProducts(): Promise<number> {
+    return this.productRepository.count({
+      where: { isActive: true },
+    });
+  }
+
+  /**
+   * Calculer le nombre de produits inactifs
+   * @returns 
+   */
+  private async countInactiveProducts(): Promise<number> {
+    return this.productRepository.count({
+      where: { isActive: false },
+    });
+  }
+
+  /**
+   * Calculer le nombre de produits en vedette
+   * @returns 
+   */
+  private async countFeaturedProducts(): Promise<number> {
+    return this.productRepository.count({
+      where: { isFeatured: true },
+    });
+  }
+
+  /**
+   * Calculer le nombre total de variants
+   * @returns 
+   */
+  private async countTotalVariants(): Promise<number> {
+    return this.variantsRepository.count();
+  }
+}
+
+
