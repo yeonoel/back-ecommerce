@@ -15,5 +15,11 @@ export class DashboardController {
   async getStats() {
     return this.dashboardService.getStats();
   }
+
+    @Get('admin/stats')
+    @Roles('admin')
+    getProductsStats() {
+      return this.dashboardService.getProductsStats();
+    }
 }
 

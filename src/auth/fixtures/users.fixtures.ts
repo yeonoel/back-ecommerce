@@ -37,7 +37,8 @@ export const mockAuthResponse: AuthResponseDto = {
     id: '1',
     email: 'test@example.com',
     firstName: 'John',
-    lastName: 'Doe'
+    lastName: 'Doe',
+    phone: '+1234567890'
   },
   token: 'jwt-token-here'
 };
@@ -48,7 +49,8 @@ export const mockAuthResponseWithOptional: AuthResponseDto = {
     id: '2',
     email: 'test2@example.com',
     firstName: 'Jane',
-    lastName: 'Smith'
+    lastName: 'Smith',
+    phone: '+9876543210'
   },
   token: 'another-jwt-token'
 };

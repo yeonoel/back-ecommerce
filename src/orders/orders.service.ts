@@ -259,12 +259,9 @@ export class OrdersService {
    * @param newStatus le nouveau statut
    * @return Promise<OrderDto>
    */
-  async updateOrderStatus(orderId: string,newStatus: OrderStatus): Promise<ResponseDto<OrderDto>> {
+  async updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId },
-        relations: ['items'],
-      });
+      const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items']});
       if (!order) {
         throw new NotFoundException('Order not found');
       }
@@ -311,7 +308,7 @@ export class OrdersService {
     const limit = paginationDto.limit || 10;
     const skip = (page - 1) * limit;
     const [orders, total] = await this.ordersRepository.findAndCount({
-      relations: ['items', 'shippingAddress', 'billingAddress'],
+      relations: ['items', 'shippingAddress', 'billingAddress', 'user'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -349,7 +346,7 @@ export class OrdersService {
    * @param currentStatus statut actuel
    * @param newStatus nouveau statut
    */
-  private validateStatusTransition(currentStatus: OrderStatus,newStatus: OrderStatus): void {
+  private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       pending_payment: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
       confirmed: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
@@ -359,6 +356,7 @@ export class OrdersService {
       cancelled: [],
       expired: [],
       payment_failed: [],
+      paid: [],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {

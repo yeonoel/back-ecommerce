@@ -20,6 +20,7 @@ import { Order } from "../entities/order.entity";
       couponCode: order.couponCode || undefined,
       customerNote: order.customerNote,
       items: order.items?.map(mapToOrderItemDto) || [],
+      user: order.user,
       itemsCount: order.items?.length || 0,
       shippingAddress: order.shippingAddressSnapshot,
       billingAddress: order.billingAddressSnapshot,

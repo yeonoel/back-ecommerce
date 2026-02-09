@@ -18,7 +18,7 @@ export class ProductsController {
 
   @Roles('admin')
   @Post()
-  @UseInterceptors(FilesInterceptor('images', 9))
+  @UseInterceptors(FilesInterceptor('images', 3))
   async createProduct(@UploadedFiles() files : Express.Multer.File[], @Body() productFormDataDto: ProductFormDataDto) {
     const createProductDto = ProductMapper.toCreateProductDto(productFormDataDto, []);
     return this.productsService.createProduct(createProductDto, files);

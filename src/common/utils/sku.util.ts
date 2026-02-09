@@ -10,3 +10,19 @@ export function generateVariantSku(productSku?: string, variant?: { color?: stri
     .filter(Boolean)
     .join('-');
 }
+
+export function generateSku(productName: string): string {
+  const prefix = 'PRD';
+
+  const namePart = productName
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .substring(0, 3)
+    .toUpperCase();
+
+  const randomPart = Math.random()
+    .toString(36)
+    .substring(2, 7)
+    .toUpperCase();
+
+  return `${prefix}-${namePart}-${randomPart}`;
+}

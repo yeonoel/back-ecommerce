@@ -12,6 +12,7 @@ import { UserRole } from 'src/users/enum/userRole.enum';
 import { calculateChange } from 'src/helper/calculChange';
 import { LowStockProductsForProducstStats, OutOfStockProductDto, ProductStatsDto } from 'src/dashboard/dto/products-stats.dto';
 import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
+import { OrderStatus } from 'src/orders/enums/order-status.enum';
 
 @Injectable()
 export class DashboardService {
@@ -28,7 +29,7 @@ export class DashboardService {
     private variantsRepository: Repository<ProductVariant>,
   ) {}
 
-  async getStats(): Promise<DashboardStatsDto> {
+  /* async getStats(): Promise<DashboardStatsDto> {
     // Dates pour les calculs
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -83,7 +84,67 @@ export class DashboardService {
       recentOrders,
       lowStockProducts,
     };
+  } */
+
+
+  async getStats(): Promise<DashboardStatsDto> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfToday = today;  
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+
+
+    // 1️⃣ Ventes du jour
+    const salesToday = await this.orderRepository
+      .createQueryBuilder('order')
+      .select('COALESCE(SUM(order.total), 0)', 'total')
+      .where('order.paymentStatus = :paid', { paid: PaymentStatus.PAID })
+      .andWhere('order.paidAt BETWEEN :start AND :end', {start: startOfToday, end: endOfToday,})
+      .getRawOne();
+
+    // 2️⃣ Ventes du mois
+    const salesThisMonth = await this.orderRepository
+      .createQueryBuilder('order')
+      .select('COALESCE(SUM(order.total), 0)', 'total')
+      .where('order.paymentStatus = :paid', { paid: PaymentStatus.PAID })
+      .andWhere('order.paidAt >= :startOfMonth', { startOfMonth })
+      .getRawOne();
+
+    // 3️⃣ Total revenue
+    const totalRevenue = await this.orderRepository
+      .createQueryBuilder('order')
+      .select('COALESCE(SUM(order.total), 0)', 'total')
+      .where('order.paymentStatus = :paid', { paid: PaymentStatus.PAID })
+      .getRawOne();
+
+    // 4️⃣ Commandes en attente de livraison
+    const pendingDeliveries = await this.orderRepository.count({
+      where: {
+        status: In([OrderStatus.PAID, OrderStatus.SHIPPED]),
+      },
+    });
+
+    // 5️⃣ Produits en rupture (variants)
+    const outOfStockProducts = await this.variantsRepository
+      .createQueryBuilder('variant')
+      .where('variant.isDeleted = false')
+      .andWhere('variant.isActive = true')
+      .andWhere('(variant.stockQuantity - variant.reservedQuantity) <= 0')
+      .getCount();
+
+    return {
+      salesToday: Number(salesToday.total),
+      salesThisMonth: Number(salesThisMonth.total),
+      totalRevenue: Number(totalRevenue.total),
+      pendingDeliveries,
+      outOfStockProducts,
+    };
   }
+
 
   /**
  * Statistiques des produits

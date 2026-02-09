@@ -37,7 +37,7 @@ export class LowStockProductDto {
   image?: string;
 }
 
-export class DashboardStatsDto {
+/*export class DashboardStatsDto {
   // KPIs principaux
   totalRevenue: number;
   totalOrders: number;
@@ -55,4 +55,12 @@ export class DashboardStatsDto {
   topProducts: TopProductDto[];
   recentOrders: RecentOrderDto[];
   lowStockProducts: LowStockProductDto[];
+} */
+
+export class DashboardStatsDto {
+  salesToday: number;
+  salesThisMonth: number;
+  totalRevenue: number;
+  pendingDeliveries: number;
+  outOfStockProducts: number;
 }

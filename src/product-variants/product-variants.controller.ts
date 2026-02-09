@@ -28,7 +28,7 @@ export class ProductVariantsController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return await this.productVariantsService.remove(id);
+  async remove(@Param('idVariant') idVariant: string) {
+    return await this.productVariantsService.remove(idVariant);
   }
 }
