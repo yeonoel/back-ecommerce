@@ -63,4 +63,5 @@ export class DashboardStatsDto {
   totalRevenue: number;
   pendingDeliveries: number;
   outOfStockProducts: number;
+  revenueChange: PercentageChangeDto;
 }

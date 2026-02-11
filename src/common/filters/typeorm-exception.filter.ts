@@ -1,4 +1,3 @@
-// filters/typeorm-exception.filter.ts
 import {
   ExceptionFilter,
   Catch,

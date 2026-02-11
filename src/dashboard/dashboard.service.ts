@@ -1,18 +1,18 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThan, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { OrderItem } from '../order-items/entities/order-item.entity';
 import { DashboardStatsDto, RevenueByMonthDto, TopProductDto, RecentOrderDto, LowStockProductDto } from './dto/dashboard-stat.dto';
-import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
-import { UserRole } from 'src/users/enum/userRole.enum';
+import { PaymentStatus } from '../payments/enums/payment-status.enum';
+import { UserRole } from '../users/enum/userRole.enum';
+import { LowStockProductsForProducstStats, OutOfStockProductDto, ProductStatsDto } from '../dashboard/dto/products-stats.dto';
+import { ProductVariant } from '../product-variants/entities/product-variant.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
 import { calculateChange } from 'src/helper/calculChange';
-import { LowStockProductsForProducstStats, OutOfStockProductDto, ProductStatsDto } from 'src/dashboard/dto/products-stats.dto';
-import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
-import { OrderStatus } from 'src/orders/enums/order-status.enum';
 
 @Injectable()
 export class DashboardService {
@@ -96,9 +96,7 @@ export class DashboardService {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-
-
-    // 1️⃣ Ventes du jour
+    // Ventes du jour
     const salesToday = await this.orderRepository
       .createQueryBuilder('order')
       .select('COALESCE(SUM(order.total), 0)', 'total')
@@ -106,7 +104,7 @@ export class DashboardService {
       .andWhere('order.paidAt BETWEEN :start AND :end', {start: startOfToday, end: endOfToday,})
       .getRawOne();
 
-    // 2️⃣ Ventes du mois
+    // Ventes du mois
     const salesThisMonth = await this.orderRepository
       .createQueryBuilder('order')
       .select('COALESCE(SUM(order.total), 0)', 'total')
@@ -114,21 +112,14 @@ export class DashboardService {
       .andWhere('order.paidAt >= :startOfMonth', { startOfMonth })
       .getRawOne();
 
-    // 3️⃣ Total revenue
-    const totalRevenue = await this.orderRepository
-      .createQueryBuilder('order')
-      .select('COALESCE(SUM(order.total), 0)', 'total')
-      .where('order.paymentStatus = :paid', { paid: PaymentStatus.PAID })
-      .getRawOne();
-
-    // 4️⃣ Commandes en attente de livraison
+    // Commandes en attente de livraison
     const pendingDeliveries = await this.orderRepository.count({
-      where: {
-        status: In([OrderStatus.PAID, OrderStatus.SHIPPED]),
-      },
-    });
+      where: [
+        {status: OrderStatus.SHIPPED},
+        {status: OrderStatus.CONFIRMED},
+      ]});
 
-    // 5️⃣ Produits en rupture (variants)
+    // Produits en rupture (variants)
     const outOfStockProducts = await this.variantsRepository
       .createQueryBuilder('variant')
       .where('variant.isDeleted = false')
@@ -136,12 +127,22 @@ export class DashboardService {
       .andWhere('(variant.stockQuantity - variant.reservedQuantity) <= 0')
       .getCount();
 
+    const now = new Date();
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [totalRevenue, lastMonthRevenue ] = await Promise.all([
+      this.calculateTotalRevenue(),
+      this.calculateTotalRevenue(startOfLastMonth, endOfLastMonth),
+    ]);
+
     return {
       salesToday: Number(salesToday.total),
       salesThisMonth: Number(salesThisMonth.total),
-      totalRevenue: Number(totalRevenue.total),
+      totalRevenue: totalRevenue,
       pendingDeliveries,
       outOfStockProducts,
+      revenueChange: calculateChange(totalRevenue, lastMonthRevenue, 'vs mois dernier'),
     };
   }
 

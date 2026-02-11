@@ -13,6 +13,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/common/decorators/public.decorator';
+import { OrderFilterParams } from './dto/order-filter-params.dto';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -44,18 +45,41 @@ export class OrdersController {
     return await this.ordersService.getUserOrders(user?.id, paginationDto);
   }
 
-  @Patch('admin/orders/:id/status')
+  @Patch('admin/:id/status')
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update order status (admin)' })
   @Roles('admin')
   async updateOrderStatus(@Param('id') orderId: string,@Body() updateStatusDto: UpdateOrderStatusDto): Promise<ResponseDto<OrderDto>> {
+    console.log("================================================-------------------------------------------------")
+    console.log("tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt")
+    console.log(orderId, 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr', updateStatusDto.status)
     return await this.ordersService.updateOrderStatus(orderId,updateStatusDto.status);
   }
 
-  @Get('admin/orders/all')
+  @Get('admin/all')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async getAllOrders(@Query() paginationDto: PaginationDto): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
-    return await this.ordersService.getAllOrders(paginationDto);
+  async getAllOrders(@Query() orderFilterParams: OrderFilterParams): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+    return await this.ordersService.getAllOrders(orderFilterParams);
+  }
+
+
+  /** *********************************TODO: A supprimer dans la version finale************************************ */
+  
+  @Get('admin/orders/confirmed-payment/:id')
+  async confirmedPayment(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.ordersService.confirmPayment( id, user?.id);
+  }
+
+  @Get('admin/orders/failed-payment/:id')
+  async failedPayment(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.ordersService.FailedPayment( id, user?.id);
+
+  }
+
+  @Get('admin/orders/canceled-payment/:id')
+  async canceledPayment(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.ordersService.cancelPayment( id, user?.id);
+
   }
 }

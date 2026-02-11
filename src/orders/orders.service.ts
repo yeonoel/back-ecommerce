@@ -1,7 +1,7 @@
 import { CreateOrderDto } from './dto/create-order.dto';
 import {Injectable, NotFoundException, BadRequestException, ForbiddenException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager, Or, LessThan } from 'typeorm';
+import { Repository, DataSource, EntityManager, Or, LessThan, Between } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { Cart } from '../carts/entities/cart.entity';
 import { CartItem } from '../cart-items/entities/cart-item.entity';
@@ -20,6 +20,7 @@ import { PaginatedResponseDto } from '../common/dto/responses/paginated-response
 import { OrderStatus } from './enums/order-status.enum';
 import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
 import { Cron } from '@nestjs/schedule';
+import { OrderFilterParams } from './dto/order-filter-params.dto';
 
 @Injectable()
 export class OrdersService {
@@ -58,11 +59,14 @@ export class OrdersService {
             throw new NotFoundException(`Variant not found`);
           }
           availableStock = variant.availabledQuantity;
+          console.log(availableStock, 'availableStock');
+          console.log(variant.reservedQuantity, 'reservedQuantity');
           productName = `${cartItem.product.name} - ${variant.name}`;
         } else {
           availableStock = cartItem.product.availabledQuantity;
           productName = cartItem.product.name;
         }
+        console.log(cartItem.quantity, 'cart Item quantity');
         if (availableStock < cartItem.quantity) {
           throw new BadRequestException(
             `Not enough stock for ${productName}. Available: ${availableStock}, Requested: ${cartItem.quantity}`,
@@ -119,26 +123,7 @@ export class OrdersService {
           await manager.increment(Product,{ id: cartItem.product.id },'availabledQuantity', cartItem.quantity);
         }
       }
-      // vider le panier
-      await manager.delete(CartItem, { cart: { id: cart.id } });
-      await manager.update(Cart,{ id: cart.id },
-        {
-          subtotal: 0,
-          tax: 0,
-          shippingCost: 0,
-          discountAmount: 0,
-          total: 0,
-          couponCode: null,
-        },
-      );
-      // créer une notification
-      await manager.save(Notification, {
-        userId,
-        type: 'order_status',
-        title: 'Order Created',
-        message: `Your order ${orderNumber} has been created successfully`,
-        metadata: { orderId: order.id },
-      });
+      
       // retourner la commande complète avec les items
       const fullOrder = await manager.findOne(Order, {
         where: { id: order.id },
@@ -261,12 +246,18 @@ export class OrdersService {
    */
   async updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
+       console.log("++++++++++++++++++++++++++++++++++++++++++++++--")
+    console.log("00000000000000000000000000000000000000000000")
+    console.log(orderId, 'ppppppppppppppppppppppppppppppppppppppppppppp', newStatus)
       const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items']});
       if (!order) {
         throw new NotFoundException('Order not found');
       }
       // Valider la transition de statut
+      console.log("iciiiiiiiiiii")
       this.validateStatusTransition(order.status, newStatus);
+            console.log("iciiiiiiiiiii")
+
       // Mettre à jour le statut
       order.status = newStatus;
       // Mettre à jour les dates selon le statut
@@ -300,14 +291,25 @@ export class OrdersService {
 
   /**
    * recupérer toutes les commandes (Admin)
-   * @param paginationDto options de pagination
+   * @param orderFilterParams options de filtre
    * @return Promise<ResponseDto<PaginatedResponseDto<OrderDto>>>
    */
-  async getAllOrders(paginationDto: PaginationDto,): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
-    const page = paginationDto.page || 1;
-    const limit = paginationDto.limit || 10;
+  async getAllOrders(orderFilterParams: OrderFilterParams): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+    const {page=1, limit=100, status, date } = orderFilterParams;
     const skip = (page - 1) * limit;
+    const whereCondition :any = {};
+    if (status) {
+      whereCondition.status = status;
+    }
+    if (date) {
+      let start = new Date();
+      start.setHours(0, 0, 0, 0)
+      let end = new Date();
+      end.setHours(23, 59, 59, 999)
+      whereCondition.createdAt = Between(start, end);
+    }
     const [orders, total] = await this.ordersRepository.findAndCount({
+      where: whereCondition,
       relations: ['items', 'shippingAddress', 'billingAddress', 'user'],
       order: { createdAt: 'DESC' },
       skip,
@@ -349,14 +351,13 @@ export class OrdersService {
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       pending_payment: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-      confirmed: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      processing: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      confirmed: [OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.PROCESSING],
+      processing: [OrderStatus.SHIPPED, OrderStatus.DELIVERED],
       shipped: [OrderStatus.DELIVERED],
       delivered: [],
       cancelled: [],
       expired: [],
-      payment_failed: [],
-      paid: [],
+      payment_failed: []
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -454,7 +455,7 @@ export class OrdersService {
  * @param orderId l'ID de la commande
  * @returns Promise<OrderDto>
  */
-async confirmPayment(orderId: string): Promise<OrderDto> {
+async confirmPayment(orderId: string, idUser?: string): Promise<OrderDto> {
   return this.dataSource.transaction(async (manager) => {
     const order = await manager.findOne(Order, {
       where: { id: orderId },
@@ -487,8 +488,9 @@ async confirmPayment(orderId: string): Promise<OrderDto> {
     order.expiresAt = null;
     await manager.save(Order, order);
     //  on vide le panier
+    console.log('order.user.id$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$',order.user.id);
     const cart = await manager.findOne(Cart, {where: { user: { id: order.user.id }}});
-
+    console.log('cart$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$',cart);
     if (cart) {
       // gérer les coupon si appliqué
       if (cart.couponCode) {
@@ -500,7 +502,7 @@ async confirmPayment(orderId: string): Promise<OrderDto> {
           await manager.save(CouponUsage, {couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount});
         }
       }
-      await manager.delete(CartItem, { cartId: cart.id });
+      await manager.delete(CartItem, { cart: { id: cart.id }});
       await manager.update(Cart,{ id: cart.id },
         {
           subtotal: 0,
@@ -528,10 +530,10 @@ async confirmPayment(orderId: string): Promise<OrderDto> {
  * @param orderId l'ID de la commande
  * @returns Promise<OrderDto>
  */
-async FailedPayment(orderId: string): Promise<OrderDto> {
+async FailedPayment(orderId: string, idUser?: string): Promise<OrderDto> {
   return this.dataSource.transaction(async (manager) => {
     const order = await manager.findOne(Order, {
-      where: { id: orderId },
+      where: { id: orderId,  user: { id: idUser } },
       relations: ['items', 'items.variant', 'items.product', 'user'],
     });
     if (!order) {
@@ -566,10 +568,10 @@ async FailedPayment(orderId: string): Promise<OrderDto> {
  * @param orderId l'ID de la commande
  * @returns Promise<OrderDto>
  */
-async cancelPayment(orderId: string): Promise<OrderDto> {
+async cancelPayment(orderId: string, idUser?: string): Promise<OrderDto> {
   return this.dataSource.transaction(async (manager) => {
     const order = await manager.findOne(Order, {
-      where: { id: orderId },
+      where: { id: orderId,  user: { id: idUser } },
       relations: ['items', 'items.variant', 'items.product', 'user'],
     });
     if (!order) {
@@ -622,7 +624,7 @@ async releaseStock(orderId: string): Promise<void> {
 /**
  * Netoyer les reservations expirées (Cron job)
  */
-@Cron('* * * * *') // Toutes les minutes
+@Cron('0 * * * *') // Toutes les minutes
 async cleanupExpiredReservations() {
   const expiredOrders = await this.ordersRepository.find({
     where: {status: OrderStatus.PENDING_PAYMENT, expiresAt: LessThan(new Date()),},relations: ['user']});
