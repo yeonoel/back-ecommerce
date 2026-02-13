@@ -40,11 +40,19 @@ export class UploadService {
    * Upload plusieurs images
    */
   async uploadMultipleImages(files: Express.Multer.File[]): Promise<string[]> {
+                        console.log('lgameeeeeeeee');
+
     if (!files || files.length === 0) {
+                              console.log('ppppppppp');
+
       return [];
     }
+                        console.log('lgameeeeeeeee');
 
     const uploadPromises = files.map((file) => this.uploadImage(file));
+                            console.log('lgameeeeeeeee');
+                            console.log(uploadPromises);
+
     return await Promise.all(uploadPromises);
   }
 

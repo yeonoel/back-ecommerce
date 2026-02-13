@@ -50,9 +50,6 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order status (admin)' })
   @Roles('admin')
   async updateOrderStatus(@Param('id') orderId: string,@Body() updateStatusDto: UpdateOrderStatusDto): Promise<ResponseDto<OrderDto>> {
-    console.log("================================================-------------------------------------------------")
-    console.log("tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt")
-    console.log(orderId, 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr', updateStatusDto.status)
     return await this.ordersService.updateOrderStatus(orderId,updateStatusDto.status);
   }
 
@@ -68,7 +65,7 @@ export class OrdersController {
   
   @Get('admin/orders/confirmed-payment/:id')
   async confirmedPayment(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.ordersService.confirmPayment( id, user?.id);
+    return await this.ordersService.confirmPayment(id, user?.id);
   }
 
   @Get('admin/orders/failed-payment/:id')

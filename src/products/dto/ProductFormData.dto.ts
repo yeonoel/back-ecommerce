@@ -1,4 +1,4 @@
-import { IsBooleanString, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBooleanString, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ProductFormDataDto {
   @IsNotEmpty()
@@ -17,7 +17,7 @@ export class ProductFormDataDto {
 
   @IsNumberString()
   @IsNotEmpty()
-  price: string;
+  price?: string;
 
   @IsOptional()
   @IsNumberString()
@@ -43,7 +43,7 @@ export class ProductFormDataDto {
   @IsNumberString()
   lowStockThreshold?: string;
 
-  // ⚙️ Flags
+  // Flags
   @IsOptional()
   @IsBooleanString()
   isActive?: string;
@@ -52,12 +52,12 @@ export class ProductFormDataDto {
   @IsBooleanString()
   isFeatured?: string;
 
-  // 🗂 Category
+  // Category
   @IsOptional()
   @IsUUID()
   categoryId?: string;
 
-  // 🔍 SEO
+  // SEO
   @IsOptional()
   @IsString()
   metaTitle?: string;
@@ -66,7 +66,7 @@ export class ProductFormDataDto {
   @IsString()
   metaDescription?: string;
 
-  // 📐 Dimensions
+  // Dimensions
   @IsOptional()
   @IsNumberString()
   weight?: string;
@@ -82,6 +82,7 @@ export class ProductFormDataDto {
   @IsOptional()
   @IsNumberString()
   height?: string;
+
 
   /**
    * variants arrive en JSON string car la requete est envoyé en multipart/form-data
