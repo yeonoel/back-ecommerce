@@ -1,5 +1,3 @@
-// src/upload/upload.service.ts
-
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import sharp from 'sharp';
@@ -22,14 +20,11 @@ export class UploadService {
     try {
       // Optimiser l'image avec Sharp
       const optimizedBuffer = await this.optimizeImage(file.buffer);
-
       // Upload vers Cloudinary
       const result = await this.uploadToCloudinary(
         optimizedBuffer,
         file.originalname,
       );
-
-      // 4. Retourner l'URL publique
       return result.secure_url;
     } catch (error) {
       throw new BadRequestException(`Upload failed: ${error.message}`);
@@ -38,26 +33,25 @@ export class UploadService {
 
   /**
    * Upload plusieurs images
+   * @param files Les fichiers à uploader
+   * @returns Un tableau d'URLs publiques des images uploadées
+   * @throws Une exception si l'upload échoue
    */
   async uploadMultipleImages(files: Express.Multer.File[]): Promise<string[]> {
-                        console.log('lgameeeeeeeee');
-
     if (!files || files.length === 0) {
-                              console.log('ppppppppp');
-
       return [];
     }
-                        console.log('lgameeeeeeeee');
-
     const uploadPromises = files.map((file) => this.uploadImage(file));
-                            console.log('lgameeeeeeeee');
-                            console.log(uploadPromises);
+    console.log(uploadPromises);
 
     return await Promise.all(uploadPromises);
   }
 
   /**
-   * Supprimer une image de Cloudinary
+   * Delete an image from Cloudinary
+   * @param image_url The public URL of the image to delete
+   * @returns A promise which resolves when the image is deleted
+   * @throws An error if the deletion fails
    */
   async deleteImage(imageUrl: string): Promise<void> {
     try {
