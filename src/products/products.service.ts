@@ -535,9 +535,7 @@ export class ProductsService {
       const product = await manager.findOne(Product, { where: { id } });
       if (!product) throw new NotFoundException('Product not found');
       const existOrderItem = await manager.exists(OrderItem, { where: { product: { id }, order: { status: Not(OrderStatus.CANCELLED) } } });
-      console.log(existOrderItem, "existOrderItemoooooooooooooooooooooooooo");
       if (existOrderItem) throw new ConflictException('Cannot delete linked to active or paid order');
-      console.log(existOrderItem, "existOrderItemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
       const hasEnyOrder = await manager.exists(OrderItem, { where: { product: { id } } });
       if (hasEnyOrder) {
         await manager.remove(product);
