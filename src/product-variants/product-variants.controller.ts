@@ -5,14 +5,14 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 
 @Controller('product-variants')
 export class ProductVariantsController {
-  constructor(private readonly productVariantsService: ProductVariantsService) {}
+  constructor(private readonly productVariantsService: ProductVariantsService) { }
 
-  @Post()
+  @Post('/:productId/variants')
   async create(@Param('productId') productId: string, @Body() createProductVariantDto: CreateProductVariantDto) {
     return this.productVariantsService.create(productId, createProductVariantDto);
   }
 
-  @Get()
+  @Get('/:productId/variants')
   async findAll(@Param('productId') productId: string) {
     return this.productVariantsService.findAll(productId);
   }
@@ -27,8 +27,8 @@ export class ProductVariantsController {
     return this.productVariantsService.update(id, dto);
   }
 
-  @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return await this.productVariantsService.remove(id);
+  @Delete(':idVariant')
+  async remove(@Param('idVariant') idVariant: string) {
+    return await this.productVariantsService.remove(idVariant);
   }
 }

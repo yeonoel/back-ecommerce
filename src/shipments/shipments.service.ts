@@ -15,7 +15,6 @@ export class ShipmentsService {
     private readonly shipmentRepository: Repository<Shipment>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
-
     private readonly mailService: MailService,
   ) {}
   

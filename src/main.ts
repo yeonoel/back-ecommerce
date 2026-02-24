@@ -22,7 +22,7 @@ async function bootstrap() {
     // TODO: On va le restreindre après le premier déploiement
     origin: '*', 
     credentials: true,
-    methods: 'GET,PUT,POST,DELETE',
+    methods: 'GET,PUT,POST,DELETE, PATCH',
   });
 
   app.useGlobalPipes(

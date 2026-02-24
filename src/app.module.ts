@@ -28,6 +28,7 @@ import { UploadModule } from './upload/upload.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { MailModule } from './mail/mail.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -61,7 +62,8 @@ import { MailModule } from './mail/mail.module';
     UploadModule,
     WebhooksModule,
     ShipmentsModule,
-    MailModule
+    MailModule,
+    DashboardModule
   ],
   controllers: [AppController],
   providers: [

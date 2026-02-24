@@ -36,8 +36,11 @@ export class ProductVariant {
   @Column({ name: 'reserved_quantity', type: 'int', default: 0 })
   reservedQuantity: number;
 
-  @Column({ default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
+
+  @Column({ name: 'is_deleted', default: false })
+  isDeleted: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

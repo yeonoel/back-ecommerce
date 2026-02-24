@@ -3,6 +3,7 @@ export class UserDataDto {
   email: string;
   firstName: string;
   lastName: string;
+  phone: string;
 }
 
 

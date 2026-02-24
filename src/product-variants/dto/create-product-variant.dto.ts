@@ -2,7 +2,7 @@ import { IsBoolean, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class
 
 export class CreateProductVariantDto {
   @IsString()
-  name: string;
+  name?: string;
 
   @IsOptional()
   @IsString()

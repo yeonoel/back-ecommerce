@@ -1,3 +1,4 @@
+import { UserDataDto } from "src/auth/dto/Users-response";
 import { OrderItemDto } from "src/order-items/dto/order-item.dto";
 
 export class OrderDto {
@@ -14,6 +15,7 @@ export class OrderDto {
   couponCode?: string;
   customerNote?: string;
   items: OrderItemDto[];
+  user: UserDataDto;
   itemsCount: number;
   shippingAddress: any;
   billingAddress: any;

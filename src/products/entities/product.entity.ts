@@ -54,6 +54,9 @@ export class Product {
   @Column({name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({name: 'is_deleted', default: false })
+  isDeleted: boolean;
+
   @Column({name: 'is_featured', default: false })
   isFeatured: boolean;
 
