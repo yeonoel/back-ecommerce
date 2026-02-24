@@ -4,13 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, Or, LessThan, Between } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { Cart } from '../carts/entities/cart.entity';
-import { CartItem } from '../cart-items/entities/cart-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { Address } from '../addresses/entities/address.entity';
-import { Coupon } from '../coupons/entities/coupon.entity';
 import { Notification } from '../notifications/entities/notification.entity';
 import { OrderItem } from '../order-items/entities/order-item.entity';
-import { CouponUsage } from '../coupon-usage/entities/coupon-usage.entity';
 import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { OrderDto } from './dto/response/order-dto';
 import { mapToOrderDto } from './mapper/map-to-order.dto';
@@ -19,17 +16,15 @@ import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { OrderStatus } from './enums/order-status.enum';
 import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
-import { Cron } from '@nestjs/schedule';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
 import { Store } from 'src/stores/entities/store.entity';
+import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from 'src/common/helpers/buildWhatssapLink';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
-    @InjectRepository(Notification)
-    private readonly notificationsRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -125,7 +120,7 @@ export class OrdersService {
           await manager.increment(ProductVariant, { id: cartItem.variant.id }, 'reservedQuantity', cartItem.quantity);
         } else {
           // Stock géré par produit
-          await manager.increment(Product, { id: cartItem.product.id }, 'availabledQuantity', cartItem.quantity);
+          await manager.increment(Product, { id: cartItem.product.id }, 'reservedQuantity', cartItem.quantity);
         }
       }
 
@@ -137,10 +132,13 @@ export class OrdersService {
       if (!fullOrder) {
         throw new NotFoundException('Order not found');
       }
+      const whatsappUrl = getWhatsAppRedirectUrl(order, store);
+
       return {
         success: true,
         message: 'Order created successfully',
         data: mapToOrderDto(fullOrder),
+        whatssappRedirectUrl: whatsappUrl,
       };
     });
   }
@@ -213,16 +211,12 @@ export class OrdersService {
    */
   async cancelOrder(userId: string, orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items', 'user'] });
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug }, user: { id: userId } }, relations: ['items', 'user'] });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
-      // Vérifier ownership
-      if (order.user?.id !== userId) {
-        throw new ForbiddenException('You can only cancel your own orders');
-      }
       // Vérifier que la commande peut être annulée
-      if (![OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED].includes(order.status)) {
+      if (![OrderStatus.PENDING_CONFIRMATION].includes(order.status)) {
         throw new BadRequestException(
           `Cannot cancel order with status: ${order.status}`,
         );
@@ -231,8 +225,6 @@ export class OrdersService {
       order.status = OrderStatus.CANCELLED;
       order.cancelledAt = new Date();
       await manager.save(Order, order);
-      // Restaurer le stock
-      await this.restoreStock(order.items, manager);
       // Notification
       await manager.save(Notification, {
         userId,
@@ -268,14 +260,14 @@ export class OrdersService {
       // Mettre à jour le statut
       order.status = newStatus;
       // Mettre à jour les dates selon le statut
-      if (newStatus === OrderStatus.SHIPPED) {
-        order.shippedAt = new Date();
-      } else if (newStatus === OrderStatus.DELIVERED) {
+      if (newStatus === OrderStatus.DELIVERED) {
         order.deliveredAt = new Date();
       } else if (newStatus === OrderStatus.CANCELLED) {
         order.cancelledAt = new Date();
         // Restaurer le stock
         await this.restoreStock(order.items, manager);
+      } else if (newStatus === OrderStatus.APPROVED_BY_SELLER) {
+        order.approvedAt = new Date();
       }
 
       await manager.save(Order, order);
@@ -343,6 +335,133 @@ export class OrdersService {
   }
 
   /**
+   * Confirmer une commande par le client
+   * @param orderId l'ID de la commande
+   * @param storeSlug le slug de la boutique
+   * @param idUser l'ID de l'utilisateur
+   * @return Promise<OrderDto> la commande mise à jour
+   */
+  async confirmPurchase(orderId: string, storeSlug: string, idUser: string): Promise<OrderDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId, store: { slug: storeSlug }, user: { id: idUser } },
+        relations: ['items', 'items.variant', 'items.product', 'user'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      // Mettre à jour l'order
+      order.status = OrderStatus.CONFIRMED_BY_CLIENT;
+      order.confirmedAt = new Date();
+      order.expiresAt = null;
+      await manager.save(Order, order);
+      // notification
+      await manager.save(Notification, {
+        userId: order.user.id,
+        type: 'order_status',
+        title: 'Order Confirmed',
+        message: `You have successfully confirmed order ${order.orderNumber}!`,
+        metadata: { orderId: order.id },
+      });
+      return mapToOrderDto(order);
+    });
+  }
+
+  /**
+   * Approver une commande par le vendeur
+   * @param orderId l'ID de la commande
+   * @param storeSlug le slug de la boutique
+   * @return Promise<OrderDto>
+   */
+  async OrderAprouvedBySeller(orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId, store: { slug: storeSlug } },
+        relations: ['items', 'items.variant', 'items.product', 'user'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      // Convertir réservation en vente
+      for (const item of order.items) {
+        if (item.variant) {
+          // Décrémenter stock ET réservation
+          if (item.variant.stockQuantity < item.quantity) {
+            throw new BadRequestException('Not enough stock for some items');
+          }
+          await manager.decrement(ProductVariant, { id: item.variant.id }, 'stockQuantity', item.quantity,);
+          await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
+        } else {
+          if (item.product.stockQuantity < item.quantity) {
+            throw new BadRequestException('Not enough stock for some items');
+          }
+          await manager.decrement(Product, { id: item.product.id }, 'stockQuantity', item.quantity);
+          await manager.decrement(Product, { id: item.product.id }, 'reservedQuantity', item.quantity,);
+        }
+      }
+      // Mettre à jour l'order
+      order.status = OrderStatus.APPROVED_BY_SELLER;
+      order.approvedAt = new Date();
+      order.expiresAt = null;
+      await manager.save(Order, order);
+      // notification
+      await manager.save(Notification, {
+        userId: order.user.id,
+        type: 'order_status',
+        title: 'Order Confirmed',
+        message: `Your order ${order.orderNumber} has been confirmed!`,
+        metadata: { orderId: order.id },
+      });
+      const whatsappUrl = notifyClientByWhatsApp(order, order.store, order?.user?.phone);
+      return {
+        success: true,
+        message: 'Order approved successfully',
+        data: mapToOrderDto(order),
+        whatssappRedirectUrl: whatsappUrl
+      }
+    });
+  }
+
+  /**
+   * Annuler une commande par vendeur
+   * @param orderId l'ID de la commande
+   * @param idUser l'ID de l'utilisateur
+   * @param storeSlug le slug de la boutique
+   * @return Promise<OrderDto>
+   */
+  async cancelOrderBySeller(orderId: string, storeSlug: string): Promise<OrderDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId, store: { slug: storeSlug } },
+        relations: ['items', 'items.variant', 'items.product', 'user'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      // Mettre à jour l'order
+      order.status = OrderStatus.CANCELLED;
+      order.cancelledAt = new Date();
+      order.expiresAt = null;
+      await manager.save(Order, order);
+      // Liberer le stock reservedQuantity
+      await this.releaseStock(order.id);
+      // notification
+      try {
+        await manager.save(Notification, {
+          userId: order.user.id,
+          type: 'order_status',
+          title: 'Payment Failed',
+          message: `Your payment for order ${order.orderNumber} has been cancelled!`,
+          metadata: { orderId: order.id },
+        });
+      } catch (err) {
+        console.error('Notification failed', err);
+      }
+      return mapToOrderDto(order);
+    });
+  }
+
+  /**
    * Générer un numéro de commande unique
    * @param manager entité manager
    * @return le numéro de commande
@@ -351,7 +470,7 @@ export class OrdersService {
   private async generateOrderNumber(manager: any): Promise<string> {
     const year = new Date().getFullYear();
     const count = await manager.count(Order);
-    const orderNum = String(count + 1).padStart(5, '0');
+    const orderNum = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
     return `ORD-${year}-${orderNum}`;
   }
 
@@ -362,14 +481,11 @@ export class OrdersService {
    */
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending_payment: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-      confirmed: [OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.PROCESSING],
-      processing: [OrderStatus.SHIPPED, OrderStatus.DELIVERED],
-      shipped: [OrderStatus.DELIVERED],
+      pending_confirmation: [OrderStatus.CONFIRMED_BY_CLIENT, OrderStatus.CANCELLED],
+      confirmed_by_client: [OrderStatus.APPROVED_BY_SELLER, OrderStatus.CANCELLED],
+      approved_by_seller: [OrderStatus.DELIVERED],
       delivered: [],
       cancelled: [],
-      expired: [],
-      payment_failed: []
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -385,10 +501,9 @@ export class OrdersService {
    */
   private formatStatus(status: string): string {
     const statusMap: { [key: string]: string } = {
-      pending_payment: OrderStatus.PENDING_PAYMENT,
-      confirmed: OrderStatus.CONFIRMED,
-      processing: OrderStatus.PROCESSING,
-      shipped: OrderStatus.SHIPPED,
+      pending_confirmation: OrderStatus.PENDING_CONFIRMATION,
+      confirmed_by_client: OrderStatus.CONFIRMED_BY_CLIENT,
+      approved_by_seller: OrderStatus.APPROVED_BY_SELLER,
       delivered: OrderStatus.DELIVERED,
       cancelled: OrderStatus.CANCELLED,
     };
@@ -465,158 +580,6 @@ export class OrdersService {
   }
 
   /**
- * Confirmer le paiement (appelé par webhook)
- * @param orderId l'ID de la commande
- * @returns Promise<OrderDto>
- */
-  async confirmPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId },
-        relations: ['items', 'items.variant', 'items.product', 'user'],
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Convertir réservation en vente
-      for (const item of order.items) {
-        if (item.variant) {
-          // Décrémenter stock ET réservation
-          if (item.variant.stockQuantity < item.quantity) {
-            throw new BadRequestException('Not enough stock for some items');
-          }
-          await manager.decrement(ProductVariant, { id: item.variant.id }, 'stockQuantity', item.quantity,);
-          await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
-        } else {
-          if (item.product.stockQuantity < item.quantity) {
-            throw new BadRequestException('Not enough stock for some items');
-          }
-          await manager.decrement(Product, { id: item.product.id }, 'stockQuantity', item.quantity);
-          await manager.decrement(Product, { id: item.product.id }, 'reservedQuantity', item.quantity,);
-        }
-      }
-      // Mettre à jour l'order
-      order.status = OrderStatus.CONFIRMED;
-      order.paymentStatus = PaymentStatus.PAID;
-      order.paidAt = new Date();
-      order.expiresAt = null;
-      await manager.save(Order, order);
-      //  on vide le panier
-      console.log('order.user.id$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$', order.user.id);
-      const cart = await manager.findOne(Cart, { where: { user: { id: order.user.id } } });
-      console.log('cart$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$', cart);
-      if (cart) {
-        // gérer les coupon si appliqué
-        if (cart.couponCode) {
-          const coupon = await manager.findOne(Coupon, { where: { code: cart.couponCode } });
-          if (coupon) {
-            // Incrémenter usage_count
-            await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
-            // Créer coupon_usage
-            await manager.save(CouponUsage, { couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount });
-          }
-        }
-        await manager.delete(CartItem, { cart: { id: cart.id } });
-        await manager.update(Cart, { id: cart.id },
-          {
-            subtotal: 0,
-            tax: 0,
-            total: 0,
-            couponCode: null,
-          },
-        );
-      }
-
-      // notification
-      await manager.save(Notification, {
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Payment Confirmed',
-        message: `Your payment for order ${order.orderNumber} has been confirmed!`,
-        metadata: { orderId: order.id },
-      });
-      return mapToOrderDto(order);
-    });
-  }
-
-  /**
-  * Confirmer le paiement (appelé par webhook)
-  * @param orderId l'ID de la commande
-  * @returns Promise<OrderDto>
-  */
-  async FailedPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId, user: { id: idUser } },
-        relations: ['items', 'items.variant', 'items.product', 'user'],
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Mettre à jour l'order
-      order.status = OrderStatus.PAYMENT_FAILED;
-      order.paymentStatus = PaymentStatus.FAILED;
-      order.cancelledAt = new Date();
-      order.expiresAt = null;
-      await manager.save(Order, order);
-      // Liberer le stock reservedQuantity
-      await this.releaseStock(order.id);
-      // notification
-      try {
-        await manager.save(Notification, {
-          userId: order.user.id,
-          type: 'order_status',
-          title: 'Payment Failed',
-          message: `Your payment for order ${order.orderNumber} has failed!`,
-          metadata: { orderId: order.id },
-        });
-      } catch (err) {
-        console.error('Notification failed', err);
-      }
-      return mapToOrderDto(order);
-    });
-  }
-
-
-  /**
-   * Confirmer le paiement (appelé par webhook)
-   * @param orderId l'ID de la commande
-   * @returns Promise<OrderDto>
-   */
-  async cancelPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId, user: { id: idUser } },
-        relations: ['items', 'items.variant', 'items.product', 'user'],
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Mettre à jour l'order
-      order.status = OrderStatus.CANCELLED;
-      order.paymentStatus = PaymentStatus.CANCELLED;
-      order.cancelledAt = new Date();
-      order.expiresAt = null;
-      await manager.save(Order, order);
-      // Liberer le stock reservedQuantity
-      await this.releaseStock(order.id);
-      // notification
-      try {
-        await manager.save(Notification, {
-          userId: order.user.id,
-          type: 'order_status',
-          title: 'Payment Failed',
-          message: `Your payment for order ${order.orderNumber} has been cancelled!`,
-          metadata: { orderId: order.id },
-        });
-      } catch (err) {
-        console.error('Notification failed', err);
-      }
-      return mapToOrderDto(order);
-    });
-  }
-
-  /**
    * Libérer le stock (échec paiement ou expiration)
    * @param orderId l'ID de la commande
    */
@@ -634,29 +597,5 @@ export class OrdersService {
         }
       }
     });
-  }
-
-  /**
-   * Netoyer les reservations expirées (Cron job)
-   */
-  @Cron('0 * * * *') // Toutes les minutes
-  async cleanupExpiredReservations() {
-    const expiredOrders = await this.ordersRepository.find({
-      where: { status: OrderStatus.PENDING_PAYMENT, expiresAt: LessThan(new Date()), }, relations: ['user']
-    });
-    for (const order of expiredOrders) {
-      order.status = OrderStatus.EXPIRED;
-      order.paymentStatus = PaymentStatus.EXPIRED;
-      await this.ordersRepository.save(order);
-      await this.releaseStock(order.id);
-      // Notification
-      await this.notificationsRepository.save({
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Order Expired',
-        message: `Your order ${order.orderNumber} has expired. Please try again.`,
-        metadata: { orderId: order.id },
-      });
-    }
   }
 }

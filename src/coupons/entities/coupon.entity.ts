@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { CouponUsage } from '../../coupon-usage/entities/coupon-usage.entity';
 import { DiscountType } from '../enums/discount-type.dto';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('coupons')
 @Index('idx_coupons_code', ['code'])

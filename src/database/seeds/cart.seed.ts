@@ -9,10 +9,10 @@ export async function seedCarts(ds: DataSource) {
   const cartRepo = ds.getRepository(Cart);
   const userRepo = ds.getRepository(User);
 
-  const users = await userRepo.find({ 
-    where: { role: UserRole.CUSTOMER } 
+  const users = await userRepo.find({
+    where: { role: UserRole.CUSTOMER }
   });
-  
+
   if (users.length < 2) {
     throw new Error('Need at least 2 customer users for cart seeding');
   }
@@ -23,12 +23,12 @@ export async function seedCarts(ds: DataSource) {
       where: { user: { id: user.id } },
       relations: ['user']
     });
-    
+
     if (!existingCart) {
       await cartRepo.save({ user });
-      console.log(`✅ Cart created for user "${user.email}"`);
+      console.log(`✅ Cart created for user "${user.phone}"`);
     } else {
-      console.log(`ℹ️  Cart already exists for user "${user.email}"`);
+      console.log(`ℹ️  Cart already exists for user "${user.phone}"`);
     }
   }
 

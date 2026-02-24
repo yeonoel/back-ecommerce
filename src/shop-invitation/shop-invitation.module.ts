@@ -5,5 +5,6 @@ import { ShopInvitationController } from './shop-invitation.controller';
 @Module({
   controllers: [ShopInvitationController],
   providers: [ShopInvitationService],
+  exports: [ShopInvitationService],
 })
-export class ShopInvitationModule {}
+export class ShopInvitationModule { }

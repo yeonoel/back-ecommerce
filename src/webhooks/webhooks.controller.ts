@@ -9,13 +9,20 @@ export class WebhooksController {
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly ordersService: OrdersService,
-  ) {}
+  ) { }
 
   @Post('stripe')
   @Public()
+  /**
+   * Ce webhook n'est pas utilise actuellement, mais il est prêt à gérer les événements de Stripe liés aux paiements.
+   * Handle a Stripe webhook
+   * @param {RequestWithRawBody} req - the request
+   * @param {string} signature - the signature of the webhook
+   * @returns {Promise<{ received: boolean }>}
+   */
   async handleStripeWebhook(@Req() req: RequestWithRawBody, @Headers('stripe-signature') signature: string) {
     // Vérifier la signature
-    const event = this.paymentsService.verifyWebhook(req.rawBody,signature);
+    const event = this.paymentsService.verifyWebhook(req.rawBody, signature);
     console.log(`📨 Webhook received: ${event.type}`);
     switch (event.type) {
       case 'payment_intent.succeeded':
@@ -41,19 +48,19 @@ export class WebhooksController {
     const paymentIntent = event.data.object;
     const orderId = paymentIntent.metadata.order_id;
     // Confirmer le paiement et convertir réservation en vente
-    await this.ordersService.confirmPayment(orderId);
+    //await this.ordersService.confirmPayment(orderId);
   }
 
   private async handlePaymentFailed(event: any) {
     const paymentIntent = event.data.object;
     const orderId = paymentIntent.metadata.order_id;
     // Libérer le stock réservé
-    await this.ordersService.FailedPayment(orderId);
+    //await this.ordersService.FailedPayment(orderId);
   }
 
   private async handlePaymentCanceled(event: any) {
     const paymentIntent = event.data.object;
     const orderId = paymentIntent.metadata.order_id;
-    await this.ordersService.cancelPayment(orderId);
+    //await this.ordersService.cancelPayment(orderId);
   }
 }

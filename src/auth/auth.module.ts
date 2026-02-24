@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -21,6 +21,7 @@ import { ShopCustomer } from '../shop-customer/entities/shop-customer.entity';
     StoresModule,
     CartsModule,
     ShopCustomer,
+    forwardRef(() => StoresModule),
     TypeOrmModule.forFeature([User, Store, ShopCustomer]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

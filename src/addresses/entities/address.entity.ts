@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { AddressType } from '../enums/address-type.enum';
 import { User } from '../../users/entities/user.entity';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('addresses')
 @Index('idx_addresses_user_id', ['user'])

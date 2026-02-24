@@ -32,11 +32,11 @@ export class OrdersController {
     return await this.ordersService.getOrderById(user?.id, orderId, storeSlug);
   }
 
-  @Delete('/cancel-order/:id')
+  @Delete('/cancel-order/:idUser/:id')
   @ApiOperation({ summary: 'Cancel an order' })
   @HttpCode(HttpStatus.OK)
-  async cancelOrder(@CurrentUser() user: any, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.cancelOrder(user?.id, orderId, storeSlug);
+  async cancelOrder(@CurrentUser() user: any, @Param('idUser') idUser: string, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return await this.ordersService.cancelOrder(idUser, orderId, storeSlug);
   }
 
   @Get('/my-orders/all')
@@ -45,7 +45,7 @@ export class OrdersController {
     return await this.ordersService.getUserOrders(user?.id, paginationDto, storeSlug);
   }
 
-  @Patch('admin/:id/status')
+  @Patch('dashboard/:id/status')
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update order status (admin)' })
   @Roles('admin')
@@ -53,7 +53,7 @@ export class OrdersController {
     return await this.ordersService.updateOrderStatus(orderId, updateStatusDto.status, storeSlug);
   }
 
-  @Get('admin/all')
+  @Get('dashboard/all')
   @UseGuards(RolesGuard)
   @Roles('admin')
   async getAllOrders(@Query() orderFilterParams: OrderFilterParams, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
@@ -63,20 +63,19 @@ export class OrdersController {
 
   /** *********************************TODO: A supprimer dans la version finale************************************ */
 
-  @Get('admin/orders/confirmed-payment/:id')
-  async confirmedPayment(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.ordersService.confirmPayment(id, user?.id);
+  @Get('dashboard/confirmed-purchase-by-customer/idUser/:id')
+  async confirmedPurchase(@Param('id') id: string, @Param('idUser') idUser: string, @Param('storeSlug') storeSlug: string) {
+    return await this.ordersService.confirmPurchase(id, storeSlug, idUser);
   }
 
-  @Get('admin/orders/failed-payment/:id')
-  async failedPayment(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.ordersService.FailedPayment(id, user?.id);
+  @Get('dashboard/Approuved-order-by-seller/:idUser/:id')
+  async approvedOrder(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
+    return await this.ordersService.OrderAprouvedBySeller(id, storeSlug);
 
   }
 
-  @Get('admin/orders/canceled-payment/:id')
-  async canceledPayment(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.ordersService.cancelPayment(id, user?.id);
-
+  @Get('dashboard/canceled-payment/:idUser/:id')
+  async canceledPayment(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
+    return await this.ordersService.cancelOrderBySeller(id, storeSlug);
   }
 }

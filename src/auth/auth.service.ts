@@ -1,11 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RegisterDto } from './dto/Register.dto';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '../users/enum/userRole.enum';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { AuthResponseDto } from './dto/Users-response';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
@@ -24,7 +23,6 @@ export class AuthService {
     private readonly shopCustomerRepository: Repository<ShopCustomer>,
     private UsersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
     private readonly cartService: CartsService
   ) { }
 

@@ -16,6 +16,7 @@ import { OrderItem } from '../order-items/entities/order-item.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { nanoid } from 'nanoid/non-secure';
 import { Store } from 'src/stores/entities/store.entity';
+import { createSharingLinkOnSocialMedia } from 'src/common/helpers/buildWhatssapLink';
 
 @Injectable()
 export class ProductsService {
@@ -135,10 +136,16 @@ export class ProductsService {
         relations: ['images', 'variants', 'category'],
       });
 
+      if (!fullProduct) {
+        throw new NotFoundException('Product not found');
+      }
+
+      const sharingLinks = createSharingLinkOnSocialMedia(fullProduct.slug, slugStore);
+
       return {
         success: true,
         message: 'Product created successfully',
-        data: fullProduct
+        data: { ...fullProduct, sharingLinks }
       }
     });
   }

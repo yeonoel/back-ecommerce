@@ -27,7 +27,7 @@ export class DashboardService {
     private orderItemRepository: Repository<OrderItem>,
     @InjectRepository(ProductVariant)
     private variantsRepository: Repository<ProductVariant>,
-  ) {}
+  ) { }
 
   /* async getStats(): Promise<DashboardStatsDto> {
     // Dates pour les calculs
@@ -92,7 +92,7 @@ export class DashboardService {
     today.setHours(0, 0, 0, 0);
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfToday = today;  
+    const startOfToday = today;
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
@@ -101,7 +101,7 @@ export class DashboardService {
       .createQueryBuilder('order')
       .select('COALESCE(SUM(order.total), 0)', 'total')
       .where('order.paymentStatus = :paid', { paid: PaymentStatus.PAID })
-      .andWhere('order.paidAt BETWEEN :start AND :end', {start: startOfToday, end: endOfToday,})
+      .andWhere('order.paidAt BETWEEN :start AND :end', { start: startOfToday, end: endOfToday, })
       .getRawOne();
 
     // Ventes du mois
@@ -115,9 +115,10 @@ export class DashboardService {
     // Commandes en attente de livraison
     const pendingDeliveries = await this.orderRepository.count({
       where: [
-        {status: OrderStatus.SHIPPED},
-        {status: OrderStatus.CONFIRMED},
-      ]});
+        { status: OrderStatus.APPROVED_BY_SELLER },
+        { status: OrderStatus.APPROVED_BY_SELLER },
+      ]
+    });
 
     // Produits en rupture (variants)
     const outOfStockProducts = await this.variantsRepository
@@ -131,7 +132,7 @@ export class DashboardService {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    const [totalRevenue, lastMonthRevenue ] = await Promise.all([
+    const [totalRevenue, lastMonthRevenue] = await Promise.all([
       this.calculateTotalRevenue(),
       this.calculateTotalRevenue(startOfLastMonth, endOfLastMonth),
     ]);
@@ -151,7 +152,7 @@ export class DashboardService {
  * Statistiques des produits
  * @returns 
  */
-async getProductsStats(): Promise<ProductStatsDto> {
+  async getProductsStats(): Promise<ProductStatsDto> {
     // Exécuter toutes les requêtes en parallèle pour optimiser
     const [
       totalProducts,
@@ -189,21 +190,21 @@ async getProductsStats(): Promise<ProductStatsDto> {
       featuredProducts,
       totalVariants,
     };
-}
+  }
 
-/**
- * Calcul du revenu total
- * @param startDate 
- * @param endDate 
- * @returns 
- */ 
+  /**
+   * Calcul du revenu total
+   * @param startDate 
+   * @param endDate 
+   * @returns 
+   */
   private async calculateTotalRevenue(startDate?: Date, endDate?: Date): Promise<number> {
     const query = this.orderRepository
       .createQueryBuilder('order')
       .select('SUM(order.total)', 'total')
       .where('order.paymentStatus = :status', { status: PaymentStatus.PAID });
     if (startDate && endDate) {
-      query.andWhere('order.paidAt BETWEEN :startDate AND :endDate', {startDate, endDate});
+      query.andWhere('order.paidAt BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
     const result = await query.getRawOne();
     return parseFloat(result?.total || 0);
@@ -222,7 +223,7 @@ async getProductsStats(): Promise<ProductStatsDto> {
       .addSelect('SUM(order.total)', 'revenue')
       .addSelect('COUNT(order.id)', 'orders')
       .where('order.paymentStatus = :status', { status: PaymentStatus.PAID })
-      .andWhere('order.paidAt BETWEEN :startDate AND :endDate', {startDate, endDate})
+      .andWhere('order.paidAt BETWEEN :startDate AND :endDate', { startDate, endDate })
       .groupBy("TO_CHAR(order.paidAt, 'YYYY-MM')")
       .orderBy("TO_CHAR(order.paidAt, 'YYYY-MM')", 'ASC')
       .getRawMany();
@@ -244,16 +245,16 @@ async getProductsStats(): Promise<ProductStatsDto> {
   private async countOrders(startDate?: Date, endDate?: Date): Promise<number> {
     const query = this.orderRepository.createQueryBuilder('order');
     if (startDate && endDate) {
-      query.where('order.createdAt BETWEEN :startDate AND :endDate', {startDate, endDate});
+      query.where('order.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
     return query.getCount();
   }
 
-/**
- * Récuperer les commande recentes
- * @param limit 
- * @returns 
- */
+  /**
+   * Récuperer les commande recentes
+   * @param limit 
+   * @returns 
+   */
   private async getRecentOrders(limit: number): Promise<RecentOrderDto[]> {
     const orders = await this.orderRepository.find({
       relations: ['user'],
@@ -284,7 +285,7 @@ async getProductsStats(): Promise<ProductStatsDto> {
       .where('product.isActive = :isActive', { isActive: true });
 
     if (startDate && endDate) {
-      query.andWhere('product.createdAt BETWEEN :startDate AND :endDate', {startDate, endDate});
+      query.andWhere('product.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
 
     return query.getCount();
@@ -303,8 +304,8 @@ async getProductsStats(): Promise<ProductStatsDto> {
       .select('product.id', 'id')
       .addSelect('product.name', 'name')
       .addSelect('SUM("orderItem"."quantity")', 'sales')
-      .addSelect('SUM("orderItem"."quantity" * "orderItem"."unit_price")','revenue')
-      .where('order.paymentStatus = :status', {status: PaymentStatus.PAID})
+      .addSelect('SUM("orderItem"."quantity" * "orderItem"."unit_price")', 'revenue')
+      .where('order.paymentStatus = :status', { status: PaymentStatus.PAID })
       .groupBy('product.id')
       .addGroupBy('product.name')
       .orderBy('revenue', 'DESC')
@@ -369,7 +370,7 @@ async getProductsStats(): Promise<ProductStatsDto> {
       .andWhere('user.isActive = :isActive', { isActive: true });
 
     if (startDate && endDate) {
-      query.andWhere('user.createAt BETWEEN :startDate AND :endDate', {startDate,endDate});
+      query.andWhere('user.createAt BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
 
     return query.getCount();
@@ -386,19 +387,19 @@ async getProductsStats(): Promise<ProductStatsDto> {
     return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
   }
 
-/**
- * Calculer le nombre total de produits en stock
- * @returns 
- */
-private async countTotalProducts(): Promise<number> {
+  /**
+   * Calculer le nombre total de produits en stock
+   * @returns 
+   */
+  private async countTotalProducts(): Promise<number> {
     return this.productRepository.count();
-}
+  }
 
-/**
- * Calculer la valeur de l'inventaire (somme des prix des produits actifs * quantité en stock)
- * @returns 
- */
-private async calculateInventoryValue(): Promise<number> {
+  /**
+   * Calculer la valeur de l'inventaire (somme des prix des produits actifs * quantité en stock)
+   * @returns 
+   */
+  private async calculateInventoryValue(): Promise<number> {
     const result = await this.productRepository
       .createQueryBuilder('product')
       .select('SUM(product.price * product.stockQuantity)', 'totalValue')
@@ -408,10 +409,10 @@ private async calculateInventoryValue(): Promise<number> {
     return parseFloat(result?.totalValue || 0);
   }
 
-/**
- * Calculer le nombre de produits bientôt en rupture de stock
- * @returns 
- */
+  /**
+   * Calculer le nombre de produits bientôt en rupture de stock
+   * @returns 
+   */
   private async countLowStock(): Promise<number> {
     return this.productRepository
       .createQueryBuilder('product')

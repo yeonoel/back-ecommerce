@@ -15,14 +15,14 @@ export async function seedUsers(dataSource: DataSource) {
       role: UserRole.ADMIN,
     },
     {
-      email: 'john@test.com',
+      phone: '2250565676413',
       password: await bcrypt.hash('password321', 10),
       firstName: 'John',
       lastName: 'Doe',
       role: UserRole.CUSTOMER,
     },
     {
-      email: 'jane@test.com',
+      phone: '2250565676413',
       password: await bcrypt.hash('password213', 10),
       firstName: 'Jane',
       lastName: 'Doe',
@@ -37,9 +37,9 @@ export async function seedUsers(dataSource: DataSource) {
 
     if (!existing) {
       await userRepository.save(userData);
-      console.log(`✅ User "${userData.email}" created`);
+      console.log(`✅ User "${userData.phone}" created`);
     } else {
-      console.log(`ℹ️  User "${userData.email}" already exists`);
+      console.log(`ℹ️  User "${userData.phone}" already exists`);
     }
   }
 

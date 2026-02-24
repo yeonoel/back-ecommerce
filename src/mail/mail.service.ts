@@ -4,7 +4,7 @@ import { ShipmentStatus } from 'src/shipments/enums/shipment-status';
 
 @Injectable()
 export class MailService {
-  constructor(private readonly mailerService: MailerService) {}
+  constructor(private readonly mailerService: MailerService) { }
 
   async sendTestEmail(to: string) {
     await this.mailerService.sendMail({
@@ -15,7 +15,7 @@ export class MailService {
     });
   }
 
-  async sendShipmentTrackingEmail(to: string , orderId: string, trackingNumber: string, trackingUrl: string) {
+  /*async sendShipmentTrackingEmail(to: string , orderId: string, trackingNumber: string, trackingUrl: string) {
     await this.mailerService.sendMail({
       to,
       subject: 'Your order has been shipped 🚚',
@@ -25,7 +25,7 @@ export class MailService {
         <p>Tracking url: <a href="${trackingUrl}">${trackingUrl}</a></p>
       `,
     });
-  }
+  } 
 
   async sendShipmentStatusEmail(to: string, orderId: string, status: ShipmentStatus, trackingNumber?: string, trackingUrl?: string) {
     await this.mailerService.sendMail({
@@ -39,5 +39,7 @@ export class MailService {
         trackingUrl: trackingUrl,
       },});
   }
+
+  */
 }
 

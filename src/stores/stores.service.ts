@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Auth, Repository } from 'typeorm';
 import { nanoid } from 'nanoid';
 import * as bcrypt from 'bcrypt';
 import { Store } from './entities/store.entity';
@@ -16,6 +16,8 @@ import { BuildWhatsappLink } from 'src/common/helpers/buildWhatssapLink';
 import { generateUniqueSlug } from 'src/common/utils/slug.util';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from 'src/auth/auth.service';
+import { JwtService } from '@nestjs/jwt';
+import { AuthResponseDto } from '../auth/dto/Users-response';
 
 @Injectable()
 export class StoresService {
@@ -26,7 +28,7 @@ export class StoresService {
     private readonly invitationRepository: Repository<ShopInvitation>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly authService: AuthService
+    private readonly jwtService: JwtService,
   ) { }
 
 
@@ -111,9 +113,9 @@ export class StoresService {
    * Marque l'invitation comme acceptée.
    * Activer la boutique.
    * @param {OnboardingDto} dto - Informations pour la création du compte vendeur.
-   * @returns {Promise<User>} - Le compte vendeur créé.
+   * @returns {Promise<AuthResponseDto>} - Le compte vendeur créé et le token JWT.
    */
-  async onboardVendor(dto: OnboardingDto, sessionId: string): Promise<User> {
+  async onboardVendor(dto: OnboardingDto, sessionId: string): Promise<AuthResponseDto> {
 
     // Trouver l'invitation
     const invitation = await this.invitationRepository.findOne({
@@ -161,7 +163,18 @@ export class StoresService {
       status: StoreStatus.ACTIVE,
     });
 
-    await this.authService.login(vendor, sessionId, invitation.store.id);
-    return vendor;
+    const token = this.jwtService.sign({
+      sub: vendor.id,
+      phone: vendor.phone,
+      role: vendor.role,
+      storeId: invitation.store.id,
+      storeSlug: invitation.store.slug,
+    });
+
+    return {
+      success: true,
+      token,
+      data: vendor
+    }
   }
 }

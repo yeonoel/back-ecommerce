@@ -1,12 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  Index,
-  CreateDateColumn,
-  Unique,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, Unique } from 'typeorm';
 import { Product } from '../../products/entities/product.entity';
 import { ProductVariant } from '../../product-variants/entities/product-variant.entity';
 import { User } from '../../users/entities/user.entity';

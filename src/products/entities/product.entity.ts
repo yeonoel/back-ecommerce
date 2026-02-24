@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, C
 import { Category } from '../../categories/entities/category.entity';
 import { ProductVariant } from '../../product-variants/entities/product-variant.entity';
 import { ProductImage } from '../../products-images/entities/products-image.entity';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('products')
 @Unique('uq_product_slug_store', ['slug', 'store'])

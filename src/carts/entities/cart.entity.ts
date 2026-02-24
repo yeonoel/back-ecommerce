@@ -1,7 +1,7 @@
 import { User } from '../../users/entities/user.entity';
 import { CartItem } from '../../cart-items/entities/cart-item.entity';
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany, Unique } from 'typeorm';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 
 @Entity('carts')

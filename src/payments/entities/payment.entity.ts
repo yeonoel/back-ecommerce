@@ -3,7 +3,7 @@ import { Order } from '../../orders/entities/order.entity';
 import { PaymentMethodType } from '../enums/payment-method-type.enum';
 import { currencyTypes } from '../../common/enums/currency-type.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('payments')
 @Index('idx_payments_order_id', ['order'])
