@@ -11,7 +11,7 @@ import { SessionId } from '../common/decorators/session.decorator';
 @Public()
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
@@ -21,8 +21,8 @@ export class AuthController {
 
   @UseGuards(AuthGuard('local'))
   @Post("login")
-  @HttpCode(HttpStatus.OK)  
+  @HttpCode(HttpStatus.OK)
   login(@Req() req, @SessionId() sessionId): Promise<AuthResponseDto> {
-    return this.authService.login(req.user, sessionId);
-  }  
+    return this.authService.login(req.user, sessionId, req.user.storeId);
+  }
 }

@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, Primary
 import { Product } from '../../products/entities/product.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { User } from '../../users/entities/user.entity';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Entity('reviews')
 @Index('idx_reviews_product_id', ['product'])
@@ -14,6 +15,10 @@ export class Review {
   @ManyToOne(() => Product, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

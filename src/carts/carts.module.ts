@@ -4,14 +4,15 @@ import { CartsController } from './carts.controller';
 import { Cart } from './entities/cart.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CouponsModule } from 'src/coupons/coupons.module';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Cart]),
+    TypeOrmModule.forFeature([Cart, Store]),
     CouponsModule
   ],
   controllers: [CartsController],
   providers: [CartsService],
   exports: [CartsService],
 })
-export class CartsModule {}
+export class CartsModule { }

@@ -31,10 +31,10 @@ export async function seedUsers(dataSource: DataSource) {
   ];
 
   for (const userData of users) {
-    const existing = await userRepository.findOne({ 
-      where: { email: userData.email } 
+    const existing = await userRepository.findOne({
+      where: { phone: userData.phone }
     });
-    
+
     if (!existing) {
       await userRepository.save(userData);
       console.log(`✅ User "${userData.email}" created`);

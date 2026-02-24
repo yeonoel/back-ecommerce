@@ -4,17 +4,18 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { DataSource, EntityManager, Not, Repository } from 'typeorm';
-import { ResponseDto } from 'src/common/dto/responses/Response.dto';
-import { ProductImage } from 'src/products-images/entities/products-image.entity';
-import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
-import { generateSlug } from 'src/common/utils/slug.util';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
+import { ProductImage } from '../products-images/entities/products-image.entity';
+import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { generateSku, generateVariantSku } from '../common/utils/sku.util';
 import { CreateProductVariantDto } from '../product-variants/dto/create-product-variant.dto';
 import { ProductFiltersDto } from './dto/product-filters-dto';
 import { ResponseFilterDto } from './dto/response-filter.dto';
 import { UploadService } from '../upload/upload.service';
-import { OrderItem } from 'src/order-items/entities/order-item.entity';
-import { OrderStatus } from 'src/orders/enums/order-status.enum';
+import { OrderItem } from '../order-items/entities/order-item.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { nanoid } from 'nanoid/non-secure';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Injectable()
 export class ProductsService {
@@ -24,16 +25,20 @@ export class ProductsService {
     private readonly dataSource: DataSource,
     private readonly uploadService: UploadService
   ) { }
-  async createProduct(createDto: CreateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
+  async createProduct(createDto: CreateProductDto, slugStore: string, files?: Express.Multer.File[]): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const slug = generateSlug(createDto.name);
-      const existing = await manager.findOne(Product, { where: { slug } });
+      const store = await manager.findOne(Store, { where: { slug: slugStore } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const slug = await this.generateUniqueProductSlug(createDto.name, slugStore);
+      const existing = await manager.findOne(Product, { where: { slug, store: { slug: slugStore } } });
       if (existing) {
         throw new ConflictException('slug by name already exists');
       }
       if (createDto.sku) {
         const skuExists = await manager.findOne(Product, {
-          where: { sku: createDto.sku },
+          where: { sku: createDto.sku, store: { slug: slugStore } },
         });
         if (skuExists) {
           throw new ConflictException('sku already exists');
@@ -53,6 +58,7 @@ export class ProductsService {
       }
       const product = await manager.save(Product, {
         name: createDto.name,
+        store,
         slug,
         description: createDto.description,
         shortDescription: createDto.shortDescription,
@@ -125,7 +131,7 @@ export class ProductsService {
       }
 
       const fullProduct = await manager.findOne(Product, {
-        where: { id: product.id },
+        where: { id: product.id, store: { slug: slugStore } },
         relations: ['images', 'variants', 'category'],
       });
 
@@ -245,10 +251,11 @@ export class ProductsService {
    * @param filters The filters to apply to the search
    * @returns A promise with a response containing the found products, and their total count
    */
-  async findAllProducts(filters: ProductFiltersDto): Promise<ResponseFilterDto> {
+  async findAllProducts(filters: ProductFiltersDto, storeSlug?: string): Promise<ResponseFilterDto> {
     const { category, minPrice, maxPrice, search, inStock, isFeatured, sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 20 } = filters;
     const query = this.productRepository
       .createQueryBuilder('product')
+      .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.variants', 'variants', 'variants.isDeleted = false AND variants.isActive = true')
       .where('product.isDeleted = false')
@@ -280,7 +287,7 @@ export class ProductsService {
     query.orderBy(`product.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     //📄 PAGINATION
     const skip = (page - 1) * limit;
-    query.skip(skip).limit(limit);
+    query.skip(skip).take(limit);
     const [items, total] = await query.getManyAndCount();
     return {
       success: true,
@@ -295,17 +302,14 @@ export class ProductsService {
     }
   }
 
-  async findById(id: string): Promise<ResponseDto> {
+  async findBySlug(productSlug: string, storeSlug?: string): Promise<ResponseDto> {
     const product = await this.productRepository
       .createQueryBuilder('product')
+      .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect(
-        'product.variants',
-        'variants',
-        'variants.isActive = true',
-      )
+      .leftJoinAndSelect('product.variants', 'variants', 'variants.isActive = true')
       .leftJoinAndSelect('product.category', 'category')
-      .where('product.id=:id', { id })
+      .where('product.slug=:slug', { productSlug })
       .andWhere('product.isDeleted = false')
       .andWhere('product.isActive = true')
       .getOne();
@@ -336,10 +340,10 @@ export class ProductsService {
    * @throws NotFoundException If the product is not found
    * @throws ConflictException If the SKU already exists
    */
-  async updateProduct(id: string, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
+  async updateProduct(id: string, storeSlug: string, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, {
-        where: { id },
+        where: { id, store: { slug: storeSlug } },
         relations: ['images', 'variants'],
       });
       if (!product) throw new NotFoundException('Product not found');
@@ -417,7 +421,7 @@ export class ProductsService {
         }
       } */
       const updatedProduct = await manager.findOne(Product, {
-        where: { id },
+        where: { id, store: { slug: storeSlug } },
         relations: ['images', 'variants', 'category'],
       });
       if (!updatedProduct) throw new NotFoundException('Product not found');
@@ -530,9 +534,9 @@ export class ProductsService {
   
   */
 
-  async removeProduct(id: string): Promise<ResponseDto> {
+  async removeProduct(id: string, storeSlug?: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { id } });
+      const product = await manager.findOne(Product, { where: { id, store: { slug: storeSlug } } });
       if (!product) throw new NotFoundException('Product not found');
       const existOrderItem = await manager.exists(OrderItem, { where: { product: { id }, order: { status: Not(OrderStatus.CANCELLED) } } });
       if (existOrderItem) throw new ConflictException('Cannot delete linked to active or paid order');
@@ -602,5 +606,45 @@ export class ProductsService {
       }
       await manager.save(images);
     }
+  }
+
+  private async generateUniqueProductSlug(
+    name: string,
+    storeSlug: string,
+    currentProductId?: string,
+  ): Promise<string> {
+    const baseSlug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')   // supprime les accents
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    let slug = baseSlug;
+    let attempt = 0;
+
+    while (attempt < 10) {
+      const query = this.productRepository
+        .createQueryBuilder('product')
+        .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
+        .where('product.slug = :slug', { slug })
+
+      // En cas d'UPDATE, exclure le produit en cours de modification
+      if (currentProductId) {
+        query.andWhere('product.id != :id', { id: currentProductId });
+      }
+
+      const existing = await query.getOne();
+
+      if (!existing) break; // slug disponible dans cette boutique
+
+      attempt++;
+      slug = `${baseSlug}-${nanoid(5).toLowerCase()}`;
+    }
+    if (attempt === 10) {
+      throw new ConflictException('Unable to generate unique slug for product');
+    }
+
+    return slug;
   }
 }

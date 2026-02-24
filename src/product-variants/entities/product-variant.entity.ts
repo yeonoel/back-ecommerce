@@ -1,8 +1,9 @@
 import { Product } from '../../products/entities/product.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
 
 
 @Entity('product_variants')
+@Unique('uq_variant_sku_product', ['sku', 'product'])
 @Index('idx_product_variants_product_id', ['product'])
 export class ProductVariant {
   @PrimaryGeneratedColumn('uuid')

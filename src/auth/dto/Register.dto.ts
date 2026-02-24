@@ -1,10 +1,11 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUrl, MinLength } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUrl, Matches, MinLength } from "class-validator";
 
 export class RegisterDto {
-    @IsEmail()
-    @IsNotEmpty({ message: 'email is required' })
+
+    @IsNotEmpty({ message: 'phone is required' })
     @IsString()
-    email: string;
+    @Matches(/^\+225(01|05|07|25|27)[0-9]{8}$/, { message: 'Phone must be in format +225XXXXXXXXXX' })
+    phone: string;
 
     @IsNotEmpty({ message: 'password is required' })
     @IsString()
@@ -21,11 +22,10 @@ export class RegisterDto {
 
     @IsOptional()
     @IsString()
-    @IsPhoneNumber('CI')
-    phone?: string;
-
-    @IsOptional()
-    @IsString()
     @IsUrl()
     avatarUrl?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    storeSlug: string;
 }

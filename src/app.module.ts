@@ -29,6 +29,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { ShipmentsModule } from './shipments/shipments.module';
 import { MailModule } from './mail/mail.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { StoresModule } from './stores/stores.module';
+import { ShopInvitationModule } from './shop-invitation/shop-invitation.module';
+import { ShopCustomerModule } from './shop-customer/shop-customer.module';
 
 @Module({
   imports: [
@@ -63,7 +66,10 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WebhooksModule,
     ShipmentsModule,
     MailModule,
-    DashboardModule
+    DashboardModule,
+    StoresModule,
+    ShopInvitationModule,
+    ShopCustomerModule
   ],
   controllers: [AppController],
   providers: [

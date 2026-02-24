@@ -11,24 +11,32 @@ import { ValidateCouponResponseDto } from './dto/responses/validate-coupon-respo
 import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
 import { CouponFilterDto } from './dto/coupon-filter.dto';
 import { CalculationHelper } from 'src/common/helpers/calculation.helper';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Injectable()
 export class CouponsService {
   constructor(
     @InjectRepository(Coupon)
-    private couponRepository: Repository<Coupon>,
+    private readonly couponRepository: Repository<Coupon>,
     @InjectRepository(CouponUsage)
-    private couponUsageRepository: Repository<CouponUsage>,
-  ) {}
+    private readonly couponUsageRepository: Repository<CouponUsage>,
+    @InjectRepository(Store)
+    private readonly storeRepository: Repository<Store>,
+  ) { }
 
   /**
    * Créer un coupon
    * @param createCouponDto 
+   * @param storeId
    * @returns Le coupon créer
    */
-  async create(createCouponDto: CreateCouponDto): Promise<Coupon> {
+  async create(createCouponDto: CreateCouponDto, storeId: string): Promise<Coupon> {
     const code = createCouponDto.code.toUpperCase();
-    const existingCoupon = await this.couponRepository.findOne({ where: { code } });
+    const store = await this.storeRepository.findOne({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+    const existingCoupon = await this.couponRepository.findOne({ where: { code, store: { id: storeId } } });
     if (existingCoupon) {
       throw new ConflictException(`Coupon already exists`);
     }
@@ -53,32 +61,33 @@ export class CouponsService {
 
   /**
    * recuperer tous les coupons
-   * @param page 
-   * @param limit 
+   * @param filters : les filtres de recherche et de pagination
+   * @param storeId : ID du magasin pour lequel récupérer les coupons
    * @returns La liste des coupons avec leur pagination
    */
-  async findAllCoupons(filters: CouponFilterDto): Promise<PaginatedResponseDto<Coupon>> {
-    const { page = 1, limit = 10, isValid, sortOrder='desc', sortBy='createdAt' } = filters;
+  async findAllCoupons(filters: CouponFilterDto, storeId?: string): Promise<PaginatedResponseDto<Coupon>> {
+    const { page = 1, limit = 10, isValid, sortOrder = 'desc', sortBy = 'createdAt' } = filters;
     const query = this.couponRepository
       .createQueryBuilder('coupon')
+      .innerJoinAndSelect('coupon.store', 'store', 'store.id = :storeId', { storeId })
       .leftJoinAndSelect('coupon.usages', 'usages')
       .leftJoinAndSelect('usages.user', 'user');
     // Le coupon est valide si le champs isActive est true et la date de validité est dans le futur
     const now = new Date();
     if (isValid === true) {
       query
-      .andWhere('coupon.isActive = true')
-      .andWhere('coupon.validFrom <= :now', { now })
-      .andWhere('coupon.validUntil >= :now', { now })
-      .andWhere('coupon.usageLimit > coupon.usageCount');
+        .andWhere('coupon.isActive = true')
+        .andWhere('coupon.validFrom <= :now', { now })
+        .andWhere('coupon.validUntil >= :now', { now })
+        .andWhere('coupon.usageLimit > coupon.usageCount');
     }
-     if (isValid === false) {
-    query.andWhere(`
+    if (isValid === false) {
+      query.andWhere(`
       coupon.isActive = false
       OR (coupon.validUntil IS NOT NULL AND coupon.validUntil < :now)
       OR (coupon.usageLimit IS NOT NULL AND coupon.usageCount >= coupon.usageLimit)
     `, { now });
-  }
+    }
     query.orderBy(`coupon.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     // Pagination
     const skip = (page - 1) * limit;
@@ -98,10 +107,14 @@ export class CouponsService {
   /**
    * récupérer un coupon par ID
    * @param id 
+   * @param storeId
    * @return le coupon
    */
-  async findOne(id: string): Promise<Coupon> {
-    const coupon = await this.couponRepository.findOne({ where: { id },relations: ['usages'],});
+  async findOne(id: string, storeId: string): Promise<Coupon> {
+    const coupon = await this.couponRepository.findOne({
+      where: { id, store: { id: storeId } },
+      relations: ['usages'],
+    });
     if (!coupon) {
       throw new NotFoundException(`Coupon not found`);
     }
@@ -114,12 +127,12 @@ export class CouponsService {
    * @param updateCouponDto 
    * @returns Le coupon mis à jour
    */
-  async update(id: string, updateCouponDto: UpdateCouponDto): Promise<Coupon> {
-    const coupon = await this.findOne(id);
+  async update(id: string, updateCouponDto: UpdateCouponDto, storeId: string): Promise<Coupon> {
+    const coupon = await this.findOne(id, storeId);
     // Vérifier l'unicité du code si modifié
     if (updateCouponDto.code) {
       const code = updateCouponDto.code.toUpperCase();
-      const existingCoupon = await this.couponRepository.findOne({ where: { code } });
+      const existingCoupon = await this.couponRepository.findOne({ where: { code, store: { id: storeId } } });
       if (existingCoupon && existingCoupon.id !== id) {
         throw new ConflictException(`Coupon with code ${code} already exists`);
       }
@@ -147,8 +160,8 @@ export class CouponsService {
    * @param id : ID du coupon à supprimer
    * @returns
    */
-  async remove(id: string): Promise<void> {
-    const coupon = await this.findOne(id);
+  async remove(id: string, storeId: string): Promise<void> {
+    const coupon = await this.findOne(id, storeId);
     await this.couponRepository.remove(coupon);
   }
 
@@ -158,31 +171,31 @@ export class CouponsService {
    * @param userId : ID de l'utilisateur
    * @return 
    * */
-  async validateCoupon(validateCouponDto: ValidateCouponDto, userId: string,): Promise<ValidateCouponResponseDto> {
+  async validateCoupon(validateCouponDto: ValidateCouponDto, userId: string, storeSlug: string): Promise<ValidateCouponResponseDto> {
     const { code, cartSousTotal } = validateCouponDto;
     const upperCode = code.toUpperCase();
-    const coupon = await this.couponRepository.findOne({where: { code: upperCode }});
+    const coupon = await this.couponRepository.findOne({ where: { code: upperCode, store: { slug: storeSlug } } });
     if (!coupon) {
-      return {isValid: false, message: 'Coupon not found'};
+      return { isValid: false, message: 'Coupon not found' };
     }
     if (!coupon.isActive) {
-      return {isValid: false, message: 'Coupon is inactive',};
+      return { isValid: false, message: 'Coupon is inactive', };
     }
     // Vérifier les dates de validité
     const now = new Date();
     if (coupon.validFrom && now < new Date(coupon.validFrom)) {
-      return {isValid: false, message: 'Coupon is not yet valid',};
+      return { isValid: false, message: 'Coupon is not yet valid', };
     }
     if (coupon.validUntil && now > new Date(coupon.validUntil)) {
-      return {isValid: false,message: 'Coupon has expired',};
+      return { isValid: false, message: 'Coupon has expired', };
     }
     // Vérifier la limite d'utilisation globale
     if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
-      return {isValid: false, message: 'Coupon usage limit reached'};
+      return { isValid: false, message: 'Coupon usage limit reached' };
     }
     // Vérifier le montant minimum d'achat
     if (coupon.minPurchaseAmount && cartSousTotal < Number(coupon.minPurchaseAmount)) {
-      return {isValid: false,message: `Minimum purchase amount is ${coupon.minPurchaseAmount}`};
+      return { isValid: false, message: `Minimum purchase amount is ${coupon.minPurchaseAmount}` };
     }
     // Vérifier la limite d'utilisation par utilisateur
     const userUsageCount = await this.couponUsageRepository.count({
@@ -192,7 +205,7 @@ export class CouponsService {
       },
     });
     if (coupon.usageLimitPerUser && userUsageCount >= coupon.usageLimitPerUser) {
-      return {isValid: false,message: 'You have reached the usage limit for this coupon'};
+      return { isValid: false, message: 'You have reached the usage limit for this coupon' };
     }
     // Calculer la réduction
     return {
@@ -207,24 +220,24 @@ export class CouponsService {
    * @param cartSousTotal le sous-total du panier
    * @returns le montant de la réduction
    */
- public calculateDiscount(coupon: Coupon, cartSousTotal: number): number {
-  cartSousTotal = CalculationHelper.max(0, cartSousTotal);
-  let discount = 0;
-  switch(coupon.discountType) {
-    case DiscountType.PERCENTAGE:
-      discount = CalculationHelper.applyDiscountPercentage(cartSousTotal, coupon.discountValue);
-      break;
-    case DiscountType.FIXED_AMOUNT:
-      discount = CalculationHelper.applyDiscountFixedAmount(coupon.discountValue, cartSousTotal);
-      break;
-    default:
-      throw new Error(`Unknown discount type: ${coupon.discountType}`);
+  public calculateDiscount(coupon: Coupon, cartSousTotal: number): number {
+    cartSousTotal = CalculationHelper.max(0, cartSousTotal);
+    let discount = 0;
+    switch (coupon.discountType) {
+      case DiscountType.PERCENTAGE:
+        discount = CalculationHelper.applyDiscountPercentage(cartSousTotal, coupon.discountValue);
+        break;
+      case DiscountType.FIXED_AMOUNT:
+        discount = CalculationHelper.applyDiscountFixedAmount(coupon.discountValue, cartSousTotal);
+        break;
+      default:
+        throw new Error(`Unknown discount type: ${coupon.discountType}`);
+    }
+    if (coupon.maxDiscountAmount !== undefined) {
+      discount = CalculationHelper.min(discount, coupon.maxDiscountAmount);
+    }
+    return discount;
   }
-  if (coupon.maxDiscountAmount !== undefined) {
-    discount = CalculationHelper.min(discount, coupon.maxDiscountAmount);
-  }
-  return discount;
-}
 
   async applyCoupon(couponId: string, userId: string, orderId: string, discountAmount: number): Promise<void> {
     // Incrémenter le compteur d'utilisation

@@ -1,6 +1,7 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { CouponUsage } from '../../coupon-usage/entities/coupon-usage.entity';
 import { DiscountType } from '../enums/discount-type.dto';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Entity('coupons')
 @Index('idx_coupons_code', ['code'])
@@ -15,7 +16,11 @@ export class Coupon {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({name: 'discount_type', type: 'enum', enum: DiscountType, default: DiscountType.PERCENTAGE})
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store
+
+  @Column({ name: 'discount_type', type: 'enum', enum: DiscountType, default: DiscountType.PERCENTAGE })
   discountType: DiscountType;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })

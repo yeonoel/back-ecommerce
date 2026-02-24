@@ -11,12 +11,17 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersModule } from '../users/users.module';
 import { CartsModule } from '../carts/carts.module';
+import { Store } from '../stores/entities/store.entity';
+import { StoresModule } from '../stores/stores.module';
+import { ShopCustomer } from '../shop-customer/entities/shop-customer.entity';
 
 @Module({
   imports: [
     UsersModule,
+    StoresModule,
     CartsModule,
-    TypeOrmModule.forFeature([User]),
+    ShopCustomer,
+    TypeOrmModule.forFeature([User, Store, ShopCustomer]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -31,8 +36,8 @@ import { CartsModule } from '../carts/carts.module';
     AuthService,
     LocalStrategy,
     JwtStrategy,
-    JwtAuthGuard  
+    JwtAuthGuard
   ],
   exports: [JwtAuthGuard]
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -1,9 +1,12 @@
 import { User } from '../../users/entities/user.entity';
 import { CartItem } from '../../cart-items/entities/cart-item.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany, Unique } from 'typeorm';
+import { Store } from 'src/stores/entities/store.entity';
 
 
 @Entity('carts')
+@Unique(['user', 'store'])
+@Unique(['sessionId', 'store'])
 @Index('idx_carts_user_id', ['user'])
 @Index('idx_carts_session_id', ['sessionId'])
 export class Cart {
@@ -13,6 +16,10 @@ export class Cart {
   @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User | null;
+
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store;
 
   @OneToMany(() => CartItem, cartItem => cartItem.cart)
   items: CartItem[];

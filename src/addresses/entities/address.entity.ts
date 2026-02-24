@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { AddressType } from '../enums/address-type.enum';
 import { User } from '../../users/entities/user.entity';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Entity('addresses')
 @Index('idx_addresses_user_id', ['user'])
@@ -12,37 +13,41 @@ export class Address {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store
+
   @Column({ name: 'user_id' })
   userId: string;
 
-  @Column({name: 'address_type', type: 'enum', enum: AddressType, default: AddressType.SHIPPING })
+  @Column({ name: 'address_type', type: 'enum', enum: AddressType, default: AddressType.SHIPPING })
   addressType: AddressType;
 
-  @Column({name: 'is_default',default: false })
+  @Column({ name: 'is_default', default: false })
   isDefault: boolean;
 
-  @Column({name: 'street_address', type: 'varchar', length: 255,nullable: false})
+  @Column({ name: 'street_address', type: 'varchar', length: 255, nullable: false })
   streetAddress: string;
 
-  @Column({length: 100, nullable: true })
+  @Column({ length: 100, nullable: true })
   apartment: string;
 
-  @Column({length: 100,nullable: false})
+  @Column({ length: 100, nullable: false })
   city: string;
 
-  @Column({length: 100,nullable: true})
+  @Column({ length: 100, nullable: true })
   state: string;
 
-  @Column({name: 'postal_code',length: 20,nullable: false})
+  @Column({ name: 'postal_code', length: 20, nullable: false })
   postalCode: string;
 
-  @Column({length: 100,nullable: false})
+  @Column({ length: 100, nullable: false })
   country: string;
 
-  @CreateDateColumn({name: 'created_at',type: 'timestamp',default: () => 'CURRENT_TIMESTAMP'})
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
-  @UpdateDateColumn({name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
   updatedAt: Date;
 
   getFormattedAddress(): string {
