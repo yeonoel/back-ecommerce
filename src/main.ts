@@ -6,9 +6,9 @@ import { TypeOrmExceptionFilter } from './common/filters/typeorm-exception.filte
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
-    console.log(process.env.NODE_ENV);
+  console.log(process.env.NODE_ENV);
 
-  const app = await NestFactory.create(AppModule, {rawBody: true});
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(cookieParser());
   const port = process.env.PORT || 3000;
 
@@ -20,19 +20,19 @@ async function bootstrap() {
 
   app.enableCors({
     // TODO: On va le restreindre après le premier déploiement
-    origin: '*', 
+    origin: '*',
     credentials: true,
     methods: 'GET,PUT,POST,DELETE, PATCH',
   });
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,              
-      forbidNonWhitelisted: true,  
-      transform: true,             
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       validationError: {
-        target: false,            
-        value: false,         
+        target: false,
+        value: false,
       },
     }),
   );
@@ -46,7 +46,7 @@ async function bootstrap() {
       .setTitle('E-commerce API')
       .setDescription('Documentation de l’API E-commerce')
       .setVersion('1.0')
-      .addBearerAuth( {type: 'http', scheme: 'bearer', bearerFormat: 'JWT'},'access-token')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

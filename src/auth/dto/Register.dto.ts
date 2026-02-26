@@ -1,7 +1,6 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUrl, Matches, MinLength } from "class-validator";
 
 export class RegisterDto {
-
     @IsNotEmpty({ message: 'phone is required' })
     @IsString()
     @Matches(/^\+225(01|05|07|25|27)[0-9]{8}$/, { message: 'Phone must be in format +225XXXXXXXXXX' })
@@ -27,5 +26,5 @@ export class RegisterDto {
 
     @IsString()
     @IsNotEmpty()
-    storeSlug: string;
+    storeSlug?: string;
 }

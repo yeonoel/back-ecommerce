@@ -8,26 +8,13 @@ export async function seedUsers(dataSource: DataSource) {
 
   const users = [
     {
-      email: 'admin@test.com',
       password: await bcrypt.hash('password123', 10),
-      firstName: 'Admin',
-      lastName: 'User',
-      role: UserRole.ADMIN,
-    },
-    {
-      phone: '2250565676413',
-      password: await bcrypt.hash('password321', 10),
-      firstName: 'John',
-      lastName: 'Doe',
-      role: UserRole.CUSTOMER,
-    },
-    {
-      phone: '2250565676413',
-      password: await bcrypt.hash('password213', 10),
-      firstName: 'Jane',
-      lastName: 'Doe',
-      role: UserRole.CUSTOMER,
-    },
+      firstName: 'super',
+      lastName: 'Admin',
+      role: UserRole.SUPER_ADMIN,
+      phone: '+2250565676413',
+
+    }
   ];
 
   for (const userData of users) {

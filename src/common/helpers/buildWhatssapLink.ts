@@ -16,7 +16,6 @@ export function BuildWhatsappLink(
     vendorName: string,
     storeName: string,
     inviteCode: string,
-    tempPasswordPlain: string,
     expiresAt: Date,
 ): string {
     const cleaned = phoneNumber.replace(/\D/g, '');
@@ -29,7 +28,6 @@ export function BuildWhatsappLink(
         ``,
         `Voici vos identifiants pour vous connecter :`,
         `🔑 Code d'invitation : *${inviteCode}*`,
-        `🔒 Mot de passe temporaire : *${tempPasswordPlain}*`,
         ``,
         `Connectez-vous ici :`,
         `👉 https://votresite.com/onboarding`,

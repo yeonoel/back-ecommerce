@@ -11,21 +11,21 @@ export class User {
   @Column({ length: 20, nullable: false, unique: true })
   phone: string;
 
-  @Column({ length: 255, nullable: false })
+  @Column({ length: 255, nullable: true })
   @Exclude()
-  password: string;
+  password?: string;
 
   @OneToMany(() => Address, (address) => address.user, { cascade: true })
   addresses: Address[];
 
-  @Column({ name: 'first_name', length: 100, nullable: false })
-  firstName: string;
+  @Column({ name: 'first_name', length: 100, nullable: true })
+  firstName?: string;
 
-  @Column({ name: 'last_name', length: 100, nullable: false })
-  lastName: string;
+  @Column({ name: 'last_name', length: 100, nullable: true })
+  lastName?: string;
 
   @Column({ name: 'avatar_url', length: 500, nullable: true })
-  avatarUrl: string;
+  avatarUrl?: string;
 
   @Column({ name: 'email_verified', default: false })
   emailVerified: boolean;

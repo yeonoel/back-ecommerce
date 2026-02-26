@@ -18,6 +18,9 @@ import { UsersService } from 'src/users/users.service';
 import { AuthService } from 'src/auth/auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { AuthResponseDto } from '../auth/dto/Users-response';
+import { UpdateStoreDto } from './dto/update-store.dto';
+import { mapToOrderDto } from 'src/orders/mapper/map-to-order.dto';
+import { mapToUserDto } from 'src/auth/mapper/map-To-user-dto';
 
 @Injectable()
 export class StoresService {
@@ -65,8 +68,6 @@ export class StoresService {
 
     // Générer le code d'invitation et le mot de passe temporaire
     const inviteCode = nanoid(10).toUpperCase();
-    const tempPasswordPlain = nanoid(12);
-    const tempPasswordHashed = await bcrypt.hash(tempPasswordPlain, 10);
 
     // Expiration dans 7 jours
     const expiresAt = new Date();
@@ -78,7 +79,6 @@ export class StoresService {
       phoneNumber: dto.phoneNumber,
       vendorName: dto.vendorName,
       inviteCode,
-      tempPassword: tempPasswordHashed,
       status: InvitationStatus.PENDING,
       expiresAt,
     });
@@ -90,7 +90,6 @@ export class StoresService {
       dto.vendorName ?? '',
       store.name,
       inviteCode,
-      tempPasswordPlain,
       expiresAt,
     );
 
@@ -100,6 +99,55 @@ export class StoresService {
       storeName: store.name,
       inviteCode: invitation.inviteCode,
       whatsappLink: whatsappLink,
+    };
+  }
+
+  /**
+   * Update a store
+   * @param slugStore The slug of the store to update
+   * @param UpdateStoreDto The store to update
+   * @returns A response with the updated store
+   * @throws NotFoundException If the store is not found
+   */
+  async updateStore(slugStore: string, dto: UpdateStoreDto): Promise<storeResponseDto> {
+    const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+    Object.assign(store, {
+      ...(dto.name && { name: dto.name }),
+      ...(dto.description && { description: dto.description }),
+      ...(dto.logoUrl && { logoUrl: dto.logoUrl }),
+      ...(dto.phoneNumber && { whatsappNumber: dto.phoneNumber }),
+    });
+
+    await this.storeRepository.save(store);
+
+    return {
+      message: 'Store updated successfully',
+      storeId: store.id,
+      storeName: store.name,
+    };
+  }
+
+  async getAllStores(user: any): Promise<Store[]> {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      return this.storeRepository.find({ where: { isDeleted: false } });
+    }
+    return this.storeRepository.find({ where: { createdBy: user.id, isDeleted: false } });
+  }
+
+  async deleteStore(slugStore: string): Promise<storeResponseDto> {
+    const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+    store.isDeleted = true;
+    await this.storeRepository.save(store);
+    return {
+      message: 'Store deleted successfully',
+      storeId: store.id,
+      storeName: store.name,
     };
   }
 
@@ -115,7 +163,7 @@ export class StoresService {
    * @param {OnboardingDto} dto - Informations pour la création du compte vendeur.
    * @returns {Promise<AuthResponseDto>} - Le compte vendeur créé et le token JWT.
    */
-  async onboardVendor(dto: OnboardingDto, sessionId: string): Promise<AuthResponseDto> {
+  async onboardVendor(dto: OnboardingDto): Promise<AuthResponseDto> {
 
     // Trouver l'invitation
     const invitation = await this.invitationRepository.findOne({
@@ -133,16 +181,12 @@ export class StoresService {
       throw new BadRequestException('This invitation has expired');
     }
 
-    // Vérifier le mot de passe temporaire
-    const isPasswordValid = await bcrypt.compare(dto.tempPassword, invitation.tempPassword);
-    if (!isPasswordValid) {
-      throw new BadRequestException('Invalid temporary password');
-    }
 
     // Créer le compte vendeur
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
     const vendor = this.userRepository.create({
       password: hashedPassword,
+      phone: dto.phoneNumber,
       firstName: dto.firstName,
       lastName: dto.lastName,
       role: UserRole.SELLER,
@@ -173,8 +217,8 @@ export class StoresService {
 
     return {
       success: true,
+      data: mapToUserDto(vendor),
       token,
-      data: vendor
     }
   }
 }

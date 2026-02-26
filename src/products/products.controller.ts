@@ -12,14 +12,14 @@ import { ProductMapper } from './mapper/product-mapper';
 import { Public } from '../common/decorators/public.decorator';
 import { ProductUpdateFormDataDto } from './dto/ProductUpdateFormData.dto';
 
-@ApiTags('/:storeSlug/products')
+@ApiTags('products')
 @Controller('/:storeSlug/products')
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
   ) { }
 
-  @Roles('admin')
+  @Roles('seller')
   @Post()
   @UseInterceptors(FilesInterceptor('images', 3))
   async createProduct(@UploadedFiles() files: Express.Multer.File[], @Body() productFormDataDto: ProductFormDataDto, @Param('storeSlug') storeSlug: string) {
@@ -33,12 +33,12 @@ export class ProductsController {
     return this.productsService.findAllProducts(filters, storeSlug);
   }
 
-  @Get(':productSlug')
-  findBySlug(@Param('productSlug') productSlug: string, @Param('storeSlug') storeSlug: string) {
-    return this.productsService.findBySlug(productSlug, storeSlug);
+  @Get(':id')
+  findBySlug(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
+    return this.productsService.findBySlug(id, storeSlug);
   }
 
-  @Roles('admin')
+  @Roles('seller')
   @Patch(':id')
   @UseInterceptors(FilesInterceptor('newImages', 3))
   updateProduct(
@@ -51,7 +51,7 @@ export class ProductsController {
     return this.productsService.updateProduct(id, storeSlug, updateProductDto, files);
   }
 
-  @Roles('admin')
+  @Roles('seller')
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   removeProduct(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {

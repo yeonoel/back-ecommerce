@@ -32,8 +32,8 @@ export class ShopInvitation {
     inviteCode: string;
 
     // Mot de passe temporaire (hashé en base)
-    @Column({ name: 'temp_password', length: 255 })
-    tempPassword: string;
+    @Column({ name: 'temp_password', length: 255, nullable: true })
+    tempPassword?: string;
 
     @Column({ type: 'enum', enum: InvitationStatus, default: InvitationStatus.PENDING, })
     status: InvitationStatus;

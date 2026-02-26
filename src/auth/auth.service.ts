@@ -75,6 +75,8 @@ export class AuthService {
     return this.login(newUser, sessionId, store.id);
   }
 
+  async
+
 
   /**
    * Connecter un utilisateur
@@ -82,15 +84,17 @@ export class AuthService {
    * @param sessionId 
    * @returns 
    */
-  async login(user: User, sessionId: string, storeId: string): Promise<AuthResponseDto> {
+  async login(user: User, sessionId: string, storeId?: string): Promise<AuthResponseDto> {
     user.lastLoginAt = new Date();
     const payload = await this.buildJwtPayload(user, storeId);
 
     const token = this.jwtService.sign(payload);
-    try {
-      this.cartService.mergeGuestCartWithUserCart(user.id, sessionId, storeId);
-    } catch (error) {
-      console.error('failed to merge cart after login:', error);
+    if (storeId) {
+      try {
+        this.cartService.mergeGuestCartWithUserCart(user.id, sessionId, storeId);
+      } catch (error) {
+        console.error('failed to merge cart after login:', error);
+      }
     }
 
     return this.buildAuthResponse(user, token);

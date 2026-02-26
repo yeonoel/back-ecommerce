@@ -19,6 +19,13 @@ import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
 import { Store } from 'src/stores/entities/store.entity';
 import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from 'src/common/helpers/buildWhatssapLink';
+import { User } from 'src/users/entities/user.entity';
+import e from 'express';
+import { UserRole } from 'src/users/enum/userRole.enum';
+import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
+import { CartItem } from 'src/cart-items/entities/cart-item.entity';
+import { Coupon } from 'src/coupons/entities/coupon.entity';
+import { CouponUsage } from 'src/coupon-usage/entities/coupon-usage.entity';
 
 @Injectable()
 export class OrdersService {
@@ -35,14 +42,41 @@ export class OrdersService {
    * @param createOrderDto 
    * @return Promise<OrderDto>
    */
-  async createOrder(userId: string, createOrderDto: CreateOrderDto, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+  async createOrder(sessionId: string, createOrderDto: CreateOrderDto, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
       const store = await manager.findOne(Store, { where: { slug: storeSlug } });
       if (!store) {
         throw new NotFoundException('Store not found');
       }
+      let user = await manager.findOneBy(User, { phone: createOrderDto.address.phone });
+      if (!user) {
+        user = await manager.save(User, {
+          phone: createOrderDto.address.phone,
+          firstName: createOrderDto.address.name,
+          role: UserRole.CUSTOMER,
+        })
+      }
+      const adress = await manager.findOne(Address, {
+        where: {
+          userId: user.id,
+          city: createOrderDto.address.city,
+          neighborhood: createOrderDto.address.neighborhood,
+        },
+      });
+      if (!adress) {
+        await manager.save(Address, {
+          userId: user.id,
+          city: createOrderDto.address.city,
+          neighborhood: createOrderDto.address.neighborhood,
+          user: user
+        });
+      }
+
+      await manager.upsert(ShopCustomer, { user, store }, { conflictPaths: ['user', 'storeId'] });
+
+      const userId = user.id;
       const cart = await manager.findOne(Cart, {
-        where: { user: { id: userId }, store: { slug: storeSlug } },
+        where: { sessionId, store: { slug: storeSlug } },
         relations: ['items', 'items.product', 'items.variant'],
       });
       if (!cart || cart.items.length === 0) {
@@ -81,7 +115,7 @@ export class OrdersService {
       const order = await manager.save(Order, {
         orderNumber,
         store,
-        user: { id: userId },
+        user: user,
         paymentStatus: PaymentStatus.PENDING_PAYMENT,
         subtotal: cart.subtotal,
         tax: cart.tax,
@@ -123,7 +157,9 @@ export class OrdersService {
           await manager.increment(Product, { id: cartItem.product.id }, 'reservedQuantity', cartItem.quantity);
         }
       }
-
+      // vider le panier
+      await manager.delete(CartItem, { cart: { id: cart.id } });
+      await manager.delete(Cart, { id: cart.id });
       // retourner la commande complète avec les items
       const fullOrder = await manager.findOne(Order, {
         where: { id: order.id },
@@ -143,6 +179,53 @@ export class OrdersService {
     });
   }
 
+
+  /**
+ * Modifier le statut d'une commande (Admin)
+ * @param orderId l'ID de la commande
+ * @param storeSlug le slug de la boutique
+ * @param newStatus le nouveau statut
+ * @return Promise<OrderDto>
+ */
+  async updateOrderStatus(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items'] });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      // Valider la transition de statut
+      this.validateStatusTransition(order.status, newStatus);
+      // Mettre à jour le statut
+      order.status = newStatus;
+      // Mettre à jour les dates selon le statut
+      if (newStatus === OrderStatus.DELIVERED) {
+        order.deliveredAt = new Date();
+      } else if (newStatus === OrderStatus.CANCELLED) {
+        order.cancelledAt = new Date();
+        // Restaurer le stock
+        await this.restoreStock(order.items, manager);
+      } else if (newStatus === OrderStatus.APPROVED_BY_SELLER) {
+        order.approvedAt = new Date();
+      }
+
+      await manager.save(Order, order);
+      // Notification
+      await manager.save(Notification, {
+        userId: order.user?.id,
+        type: 'order_status',
+        title: `Order ${this.formatStatus(newStatus)}`,
+        message: `Your order ${order.orderNumber} is now ${newStatus}`,
+        metadata: { orderId: order.id },
+      });
+
+      return {
+        success: true,
+        message: 'Order status updated successfully',
+        data: mapToOrderDto(order),
+      };
+    });
+  }
+
   /**
    * récupérer les commandes d'un utilisateur
    * @param userId id de l'utilisateur
@@ -150,7 +233,7 @@ export class OrdersService {
    * @param paginationDto options de pagination
    * 
    */
-  async getUserOrders(userId: string, paginationDto: PaginationDto, storeSlug?: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+  async getUserOrders(userId: string, paginationDto: PaginationDto, storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
     const page = paginationDto.page || 1;
     const limit = paginationDto.limit || 10;
     const skip = (page - 1) * limit;
@@ -242,51 +325,6 @@ export class OrdersService {
     });
   }
 
-  /**
-   * Modifier le statut d'une commande (Admin)
-   * @param orderId l'ID de la commande
-   * @param storeSlug le slug de la boutique
-   * @param newStatus le nouveau statut
-   * @return Promise<OrderDto>
-   */
-  async updateOrderStatus(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items'] });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Valider la transition de statut
-      this.validateStatusTransition(order.status, newStatus);
-      // Mettre à jour le statut
-      order.status = newStatus;
-      // Mettre à jour les dates selon le statut
-      if (newStatus === OrderStatus.DELIVERED) {
-        order.deliveredAt = new Date();
-      } else if (newStatus === OrderStatus.CANCELLED) {
-        order.cancelledAt = new Date();
-        // Restaurer le stock
-        await this.restoreStock(order.items, manager);
-      } else if (newStatus === OrderStatus.APPROVED_BY_SELLER) {
-        order.approvedAt = new Date();
-      }
-
-      await manager.save(Order, order);
-      // Notification
-      await manager.save(Notification, {
-        userId: order.user?.id,
-        type: 'order_status',
-        title: `Order ${this.formatStatus(newStatus)}`,
-        message: `Your order ${order.orderNumber} is now ${newStatus}`,
-        metadata: { orderId: order.id },
-      });
-
-      return {
-        success: true,
-        message: 'Order status updated successfully',
-        data: mapToOrderDto(order),
-      };
-    });
-  }
 
   /**
    * recupérer toutes les commandes (Admin)
@@ -355,6 +393,31 @@ export class OrdersService {
       order.confirmedAt = new Date();
       order.expiresAt = null;
       await manager.save(Order, order);
+      // vider le panier
+      const cart = await manager.findOne(Cart, { where: { sessionId: order.user.id, store: { slug: storeSlug } }, relations: ['store'] });
+      if (cart) {
+        // gérer les coupon si appliqué
+        if (cart.couponCode) {
+          const coupon = await manager.findOne(Coupon, { where: { code: cart.couponCode } });
+          if (coupon) {
+            // Incrémenter usage_count
+            await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
+            // Créer coupon_usage
+            await manager.save(CouponUsage, { couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount });
+          }
+        }
+        await manager.delete(CartItem, { cart: { id: cart.id } });
+        await manager.update(Cart, { id: cart.id },
+          {
+            sessionId: cart.sessionId,
+            store: cart.store,
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            couponCode: null,
+          },
+        );
+      }
       // notification
       await manager.save(Notification, {
         userId: order.user.id,
@@ -469,7 +532,6 @@ export class OrdersService {
    */
   private async generateOrderNumber(manager: any): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await manager.count(Order);
     const orderNum = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
     return `ORD-${year}-${orderNum}`;
   }
@@ -523,13 +585,9 @@ export class OrdersService {
     manager: EntityManager): Promise<{ shippingSnapshot: any, billingSnapshot: any, address: Address }> {
     let address = await manager.findOne(Address, {
       where: {
-        streetAddress: createOrderDto.address.streetAddress,
         userId: userId,
         city: createOrderDto.address.city,
-        apartment: createOrderDto.address.apartment,
-        postalCode: createOrderDto.address.postalCode,
-        country: createOrderDto.address.country,
-        state: createOrderDto.address.state,
+        neighborhood: createOrderDto.address.neighborhood,
         user: { id: userId }
       },
     });
@@ -537,23 +595,15 @@ export class OrdersService {
     if (!address) {
       address = await manager.save(Address, {
         userId: userId,
-        addressType: createOrderDto.address.addressType,
-        streetAddress: createOrderDto.address.streetAddress,
-        apartment: createOrderDto.address.apartment,
         city: createOrderDto.address.city,
-        state: createOrderDto.address.state,
-        postalCode: createOrderDto.address.postalCode,
-        country: createOrderDto.address.country,
+        neighborhood: createOrderDto.address.neighborhood,
+        user: { id: userId }
       });
     }
 
     const snapshot = {
-      streetAddress: address.streetAddress,
-      apartment: address.apartment,
       city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: address.country,
+      neighborhood: address.neighborhood
     };
 
     return {

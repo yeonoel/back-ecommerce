@@ -23,6 +23,6 @@ export class AuthController {
   @Post("login")
   @HttpCode(HttpStatus.OK)
   login(@Req() req, @SessionId() sessionId): Promise<AuthResponseDto> {
-    return this.authService.login(req.user, sessionId, req.user.storeId);
+    return this.authService.login(req.user, sessionId, req.user?.storeId);
   }
 }

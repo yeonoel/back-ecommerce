@@ -258,7 +258,11 @@ export class ProductsService {
    * @param filters The filters to apply to the search
    * @returns A promise with a response containing the found products, and their total count
    */
-  async findAllProducts(filters: ProductFiltersDto, storeSlug?: string): Promise<ResponseFilterDto> {
+  async findAllProducts(filters: ProductFiltersDto, storeSlug: string): Promise<ResponseFilterDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
     const { category, minPrice, maxPrice, search, inStock, isFeatured, sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 20 } = filters;
     const query = this.productRepository
       .createQueryBuilder('product')
@@ -309,14 +313,18 @@ export class ProductsService {
     }
   }
 
-  async findBySlug(productSlug: string, storeSlug?: string): Promise<ResponseDto> {
+  async findBySlug(id: string, storeSlug?: string): Promise<ResponseDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
     const product = await this.productRepository
       .createQueryBuilder('product')
       .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.variants', 'variants', 'variants.isActive = true')
       .leftJoinAndSelect('product.category', 'category')
-      .where('product.slug=:slug', { productSlug })
+      .where('product.id=:id', { id })
       .andWhere('product.isDeleted = false')
       .andWhere('product.isActive = true')
       .getOne();
@@ -349,6 +357,10 @@ export class ProductsService {
    */
   async updateProduct(id: string, storeSlug: string, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
       const product = await manager.findOne(Product, {
         where: { id, store: { slug: storeSlug } },
         relations: ['images', 'variants'],
@@ -360,19 +372,19 @@ export class ProductsService {
         product.sku = updateProductDto.sku;
       }
       Object.assign(product, {
-        name: updateProductDto.name ?? product.name,
-        description: updateProductDto.description ?? product.description,
-        shortDescription: updateProductDto.shortDescription ?? product.shortDescription,
-        price: updateProductDto.price ?? product.price,
-        compareAtPrice: updateProductDto.compareAtPrice ?? product.compareAtPrice,
-        costPrice: updateProductDto.costPrice ?? product.costPrice,
-        stockQuantity: updateProductDto.stockQuantity ?? product.stockQuantity,
-        isFeatured: updateProductDto.isFeatured ?? product.isFeatured,
-        weight: updateProductDto.weight ?? product.weight,
-        length: updateProductDto.length ?? product.length,
-        width: updateProductDto.width ?? product.width,
-        height: updateProductDto.height ?? product.height,
-        isActive: product.isActive,
+        ...(updateProductDto.name && { name: updateProductDto.name }),
+        ...(updateProductDto.description && { description: updateProductDto.description }),
+        ...(updateProductDto.shortDescription && { shortDescription: updateProductDto.shortDescription }),
+        ...(updateProductDto.price && { price: updateProductDto.price }),
+        ...(updateProductDto.compareAtPrice && { compareAtPrice: updateProductDto.compareAtPrice }),
+        ...(updateProductDto.costPrice && { costPrice: updateProductDto.costPrice }),
+        ...(updateProductDto.stockQuantity && { stockQuantity: updateProductDto.stockQuantity }),
+        ...(updateProductDto.isFeatured && { isFeatured: updateProductDto.isFeatured }),
+        ...(updateProductDto.weight && { weight: updateProductDto.weight }),
+        ...(updateProductDto.length && { length: updateProductDto.length }),
+        ...(updateProductDto.width && { width: updateProductDto.width }),
+        ...(updateProductDto.height && { height: updateProductDto.height }),
+        ...(updateProductDto.isActive && { isActive: updateProductDto.isActive }),
       });
 
       await manager.save(product);
@@ -541,8 +553,12 @@ export class ProductsService {
   
   */
 
-  async removeProduct(id: string, storeSlug?: string): Promise<ResponseDto> {
+  async removeProduct(id: string, storeSlug: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
       const product = await manager.findOne(Product, { where: { id, store: { slug: storeSlug } } });
       if (!product) throw new NotFoundException('Product not found');
       const existOrderItem = await manager.exists(OrderItem, { where: { product: { id }, order: { status: Not(OrderStatus.CANCELLED) } } });

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode, Session } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
@@ -12,10 +12,10 @@ import { RolesGuard } from 'src/common/guards/roles.gaurds';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/common/decorators/public.decorator';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
+import { SessionId } from 'src/common/decorators/session.decorator';
 
-@ApiTags('/:storeSlug/orders')
+@ApiTags('/orders')
 @Controller('/:storeSlug/orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
@@ -23,8 +23,8 @@ export class OrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new order' })
-  async createOrder(@CurrentUser() user: any, @Body() createOrderDto: CreateOrderDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.createOrder(user?.id, createOrderDto, storeSlug);
+  async createOrder(@SessionId() sessionId: string, @Body() createOrderDto: CreateOrderDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return await this.ordersService.createOrder(sessionId, createOrderDto, storeSlug);
   }
 
   @Get('/get-order/:id')
