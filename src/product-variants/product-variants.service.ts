@@ -113,6 +113,7 @@ export class ProductVariantsService {
         ...(updateProductVariantDto.color && { color: updateProductVariantDto.color }),
         ...(updateProductVariantDto.size && { size: updateProductVariantDto.size }),
         ...(updateProductVariantDto.price && { price: updateProductVariantDto.price }),
+        ...(updateProductVariantDto.stockQuantity && { stockQuantity: updateProductVariantDto.stockQuantity }),
         ...(updateProductVariantDto.sku && { sku: updateProductVariantDto.sku }),
       });
       const savedVariant = await manager.save(variant);

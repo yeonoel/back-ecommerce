@@ -20,7 +20,6 @@ import { OrderFilterParams } from './dto/order-filter-params.dto';
 import { Store } from 'src/stores/entities/store.entity';
 import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from 'src/common/helpers/buildWhatssapLink';
 import { User } from 'src/users/entities/user.entity';
-import e from 'express';
 import { UserRole } from 'src/users/enum/userRole.enum';
 import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
 import { CartItem } from 'src/cart-items/entities/cart-item.entity';
@@ -46,7 +45,7 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       const store = await manager.findOne(Store, { where: { slug: storeSlug } });
       if (!store) {
-        throw new NotFoundException('Store not found');
+        throw new NotFoundException('Boutique introuvable');
       }
       let user = await manager.findOneBy(User, { phone: createOrderDto.address.phone });
       if (!user) {
@@ -66,6 +65,7 @@ export class OrdersService {
       if (!adress) {
         await manager.save(Address, {
           userId: user.id,
+          store: store,
           city: createOrderDto.address.city,
           neighborhood: createOrderDto.address.neighborhood,
           user: user
@@ -80,7 +80,7 @@ export class OrdersService {
         relations: ['items', 'items.product', 'items.variant'],
       });
       if (!cart || cart.items.length === 0) {
-        throw new BadRequestException('Cart is empty');
+        throw new BadRequestException('Le panier est vide');
       }
       // vérifier les stocks de tous les items du panier
       for (const cartItem of cart.items) {
@@ -91,7 +91,7 @@ export class OrdersService {
             where: { id: cartItem.variant.id },
           });
           if (!variant) {
-            throw new NotFoundException(`Variant not found`);
+            throw new NotFoundException(`Variant introuvable`);
           }
           availableStock = variant.availabledQuantity;
           productName = `${cartItem.product.name} - ${variant.name}`;
@@ -99,10 +99,9 @@ export class OrdersService {
           availableStock = cartItem.product.availabledQuantity;
           productName = cartItem.product.name;
         }
-        console.log(cartItem.quantity, 'cart Item quantity');
         if (availableStock < cartItem.quantity) {
           throw new BadRequestException(
-            `Not enough stock for ${productName}. Available: ${availableStock}, Requested: ${cartItem.quantity}`,
+            `Pas suffisant de stock pour  ${productName}. Disponible: ${availableStock}, Demandé: ${cartItem.quantity}`,
           );
         }
       }
@@ -166,13 +165,13 @@ export class OrdersService {
         relations: ['items', 'items.product'],
       });
       if (!fullOrder) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Commande introuvable');
       }
-      const whatsappUrl = getWhatsAppRedirectUrl(order, store);
+      const whatsappUrl = getWhatsAppRedirectUrl(fullOrder, store);
 
       return {
         success: true,
-        message: 'Order created successfully',
+        message: 'Commande crée avec success',
         data: mapToOrderDto(fullOrder),
         whatssappRedirectUrl: whatsappUrl,
       };
@@ -187,18 +186,20 @@ export class OrdersService {
  * @param newStatus le nouveau statut
  * @return Promise<OrderDto>
  */
-  async updateOrderStatus(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+  async updateOrderStatusBySeller(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items'] });
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items', 'store'] });
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Commande introuvable');
       }
       // Valider la transition de statut
       this.validateStatusTransition(order.status, newStatus);
       // Mettre à jour le statut
       order.status = newStatus;
       // Mettre à jour les dates selon le statut
-      if (newStatus === OrderStatus.DELIVERED) {
+      if (newStatus === OrderStatus.CONFIRMED_BY_CLIENT) {
+        order.confirmedAt = new Date();
+      } else if (newStatus === OrderStatus.DELIVERED) {
         order.deliveredAt = new Date();
       } else if (newStatus === OrderStatus.CANCELLED) {
         order.cancelledAt = new Date();
@@ -212,15 +213,72 @@ export class OrdersService {
       // Notification
       await manager.save(Notification, {
         userId: order.user?.id,
-        type: 'order_status',
-        title: `Order ${this.formatStatus(newStatus)}`,
-        message: `Your order ${order.orderNumber} is now ${newStatus}`,
+        store: order.store,
+        type: 'commande_status',
+        title: `commande ${this.formatStatus(newStatus)}`,
+        message: `Votre commande ${order.orderNumber} a maintenant le statut ${newStatus}`,
         metadata: { orderId: order.id },
       });
 
       return {
         success: true,
-        message: 'Order status updated successfully',
+        message: 'Commande mise à jour avec success',
+        data: mapToOrderDto(order),
+      };
+    });
+  }
+
+  /**
+* Modifier le statut d'une commande (Admin)
+* @param orderId l'ID de la commande
+* @param storeSlug le slug de la boutique
+* @param newStatus le nouveau statut
+* @return Promise<OrderDto>
+*/
+  async updateOrderStatusByCustomer(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items', 'user'] });
+      if (!order) {
+        throw new NotFoundException('Commande introuvable');
+      }
+
+      if (
+        newStatus !== OrderStatus.CONFIRMED_BY_CLIENT &&
+        newStatus !== OrderStatus.CANCELLED
+      ) {
+        throw new BadRequestException('Statut non autorisé');
+      }
+      // Valider la transition de statut
+      this.validateStatusTransition(order.status, newStatus);
+      // Mettre à jour le statut
+      order.status = newStatus;
+      // Mettre à jour les dates selon le statut
+      if (newStatus === OrderStatus.CONFIRMED_BY_CLIENT) {
+        order.confirmedAt = new Date();
+      } else if (newStatus === OrderStatus.CANCELLED) {
+        order.cancelledAt = new Date();
+        // Restaurer le stock
+        const orderItems = await manager.find(OrderItem, { where: { order: { id: order.id } }, relations: ['product'] },);
+        await this.restoreStock(orderItems, manager);
+      }
+      await manager.save(Order, order);
+      // Notification
+      await manager.save(Notification, {
+        userId: order.user?.id,
+        store: store,
+        type: 'Commande Status',
+        title: `Commande ${this.formatStatus(newStatus)}`,
+        message: `Votre commande ${order.orderNumber} a maintenant le statut ${newStatus}`,
+        metadata: { orderId: order.id },
+      });
+
+      return {
+        success: true,
+        message: 'Commande mise à jour avec success',
         data: mapToOrderDto(order),
       };
     });
@@ -273,14 +331,11 @@ export class OrdersService {
         relations: ['user', 'items', 'items.product']
       });
     if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    if (order.user?.id !== userId) {
-      throw new ForbiddenException('You can only retrieve your own orders');
+      throw new NotFoundException('Commande introuvable');
     }
     return {
       success: true,
-      message: 'Order retrieved successfully',
+      message: 'Commande obtenue avec success',
       data: mapToOrderDto(order),
     };
   }
@@ -296,12 +351,12 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug }, user: { id: userId } }, relations: ['items', 'user'] });
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Commande introuvable');
       }
       // Vérifier que la commande peut être annulée
       if (![OrderStatus.PENDING_CONFIRMATION].includes(order.status)) {
         throw new BadRequestException(
-          `Cannot cancel order with status: ${order.status}`,
+          `La commande ne peut pas etre annulée. Statut: ${order.status}`,
         );
       }
       // Mettre le statut à cancelled
@@ -311,15 +366,15 @@ export class OrdersService {
       // Notification
       await manager.save(Notification, {
         userId,
-        type: 'order_status',
-        title: 'Order Cancelled',
-        message: `Your order ${order.orderNumber} has been cancelled`,
+        type: 'Commande Status',
+        title: 'Commande Annulée',
+        message: `Votre commande ${order.orderNumber} a bien été annulée`,
         metadata: { orderId: order.id },
       });
 
       return {
         success: true,
-        message: 'Order cancelled successfully',
+        message: 'Commande annulée avec success',
         data: mapToOrderDto(order),
       };
     });
@@ -359,7 +414,7 @@ export class OrdersService {
     });
     return {
       success: true,
-      message: 'All orders retrieved successfully',
+      message: 'Toutes les commandes recupérées avec success',
       data: {
         items: orders.map(mapToOrderDto),
         pagination: {
@@ -379,111 +434,6 @@ export class OrdersService {
    * @param idUser l'ID de l'utilisateur
    * @return Promise<OrderDto> la commande mise à jour
    */
-  async confirmPurchase(orderId: string, storeSlug: string, idUser: string): Promise<OrderDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId, store: { slug: storeSlug }, user: { id: idUser } },
-        relations: ['items', 'items.variant', 'items.product', 'user'],
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Mettre à jour l'order
-      order.status = OrderStatus.CONFIRMED_BY_CLIENT;
-      order.confirmedAt = new Date();
-      order.expiresAt = null;
-      await manager.save(Order, order);
-      // vider le panier
-      const cart = await manager.findOne(Cart, { where: { sessionId: order.user.id, store: { slug: storeSlug } }, relations: ['store'] });
-      if (cart) {
-        // gérer les coupon si appliqué
-        if (cart.couponCode) {
-          const coupon = await manager.findOne(Coupon, { where: { code: cart.couponCode } });
-          if (coupon) {
-            // Incrémenter usage_count
-            await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
-            // Créer coupon_usage
-            await manager.save(CouponUsage, { couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount });
-          }
-        }
-        await manager.delete(CartItem, { cart: { id: cart.id } });
-        await manager.update(Cart, { id: cart.id },
-          {
-            sessionId: cart.sessionId,
-            store: cart.store,
-            subtotal: 0,
-            tax: 0,
-            total: 0,
-            couponCode: null,
-          },
-        );
-      }
-      // notification
-      await manager.save(Notification, {
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Order Confirmed',
-        message: `You have successfully confirmed order ${order.orderNumber}!`,
-        metadata: { orderId: order.id },
-      });
-      return mapToOrderDto(order);
-    });
-  }
-
-  /**
-   * Approver une commande par le vendeur
-   * @param orderId l'ID de la commande
-   * @param storeSlug le slug de la boutique
-   * @return Promise<OrderDto>
-   */
-  async OrderAprouvedBySeller(orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {
-        where: { id: orderId, store: { slug: storeSlug } },
-        relations: ['items', 'items.variant', 'items.product', 'user'],
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Convertir réservation en vente
-      for (const item of order.items) {
-        if (item.variant) {
-          // Décrémenter stock ET réservation
-          if (item.variant.stockQuantity < item.quantity) {
-            throw new BadRequestException('Not enough stock for some items');
-          }
-          await manager.decrement(ProductVariant, { id: item.variant.id }, 'stockQuantity', item.quantity,);
-          await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
-        } else {
-          if (item.product.stockQuantity < item.quantity) {
-            throw new BadRequestException('Not enough stock for some items');
-          }
-          await manager.decrement(Product, { id: item.product.id }, 'stockQuantity', item.quantity);
-          await manager.decrement(Product, { id: item.product.id }, 'reservedQuantity', item.quantity,);
-        }
-      }
-      // Mettre à jour l'order
-      order.status = OrderStatus.APPROVED_BY_SELLER;
-      order.approvedAt = new Date();
-      order.expiresAt = null;
-      await manager.save(Order, order);
-      // notification
-      await manager.save(Notification, {
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Order Confirmed',
-        message: `Your order ${order.orderNumber} has been confirmed!`,
-        metadata: { orderId: order.id },
-      });
-      const whatsappUrl = notifyClientByWhatsApp(order, order.store, order?.user?.phone);
-      return {
-        success: true,
-        message: 'Order approved successfully',
-        data: mapToOrderDto(order),
-        whatssappRedirectUrl: whatsappUrl
-      }
-    });
-  }
 
   /**
    * Annuler une commande par vendeur
@@ -552,7 +502,7 @@ export class OrdersService {
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
       throw new BadRequestException(
-        `Invalid status transition: ${currentStatus} -> ${newStatus}`,
+        `Impossible de passer de: ${currentStatus} -> ${newStatus}`,
       );
     }
   }
@@ -637,7 +587,7 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(Order, { where: { id: orderId }, relations: ['items', 'items.variant', 'items.product'] });
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Commande introuvable');
       }
       for (const item of order.items) {
         if (item.variant) {

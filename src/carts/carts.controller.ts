@@ -20,7 +20,7 @@ export class CartsController {
   @Public()
   @UseGuards(OptionalAuthGuard)
   async getCart(@CurrentUser() user: any, @SessionId() sessionId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
-    const cart = await this.cartsService.getOrCreateCart(user?.id, sessionId, storeSlug);
+    const cart = await this.cartsService.getOrCreateCart(user, sessionId, storeSlug);
     return {
       success: true,
       message: 'Cart retrieved successfully',
@@ -31,8 +31,8 @@ export class CartsController {
   @Post('items')
   @Public()
   @UseGuards(OptionalAuthGuard)
-  async addToCart(@CurrentUser() user: any, @SessionId() sessionId: string, @Body() createDto: CreateOrAddToCartDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
-    const cart = await this.cartsService.addToCart(user?.id, storeSlug, sessionId, createDto);
+  async addToCart(@SessionId() sessionId: string, @Body() createDto: CreateOrAddToCartDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
+    const cart = await this.cartsService.addToCart(storeSlug, sessionId, createDto);
     return {
       success: true,
       message: 'Product added to cart successfully',
@@ -40,11 +40,11 @@ export class CartsController {
     };
   }
 
-  @Patch('items/:itemId')
+  @Patch('items/:productId')
   @Public()
   @UseGuards(OptionalAuthGuard)
-  async updateCartItem(@CurrentUser() user: any, @SessionId() sessionId: string, @Param('itemId') itemId: string, @Body() updateDto: UpdateCartItemDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
-    const cart = await this.cartsService.updateCartItem(user?.id, storeSlug, sessionId, itemId, updateDto.quantity);
+  async updateCartItem(@SessionId() sessionId: string, @Param('productId') productId: string, @Body() updateDto: UpdateCartItemDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
+    const cart = await this.cartsService.updateCartProductQuantity(storeSlug, sessionId, productId, updateDto.quantity);
     return {
       success: true,
       message: 'Cart item updated successfully',
@@ -52,12 +52,12 @@ export class CartsController {
     };
   }
 
-  @Delete('items/:itemId')
+  @Delete('items/:productId')
   @UseGuards(OptionalAuthGuard)
   @Public()
   @HttpCode(HttpStatus.OK)
-  async removeFromCart(@CurrentUser() user: any, @SessionId() sessionId: string, @Param('itemId') itemId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
-    const cart = await this.cartsService.removeFromCart(user.id, storeSlug, sessionId, itemId);
+  async removeFromCart(@SessionId() sessionId: string, @Param('productId') productId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<CartDto>> {
+    const cart = await this.cartsService.removeProductFromCart(storeSlug, sessionId, productId);
     return {
       success: true,
       message: 'Product removed from cart successfully',
@@ -69,8 +69,8 @@ export class CartsController {
   @Public()
   @UseGuards(OptionalAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async clearCart(@CurrentUser() user: any, @SessionId() sessionId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<null>> {
-    await this.cartsService.clearCart(user.id, storeSlug, sessionId);
+  async clearCart(@SessionId() sessionId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<null>> {
+    await this.cartsService.clearCart(storeSlug, sessionId);
     return {
       success: true,
       message: 'Cart cleared successfully',

@@ -6,6 +6,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Public } from '../common/decorators/public.decorator';
 import { SessionId } from '../common/decorators/session.decorator';
+import { CurrentUser } from 'src/common/decorators/user.decorator';
 
 @ApiTags('auth')
 @Public()
@@ -22,7 +23,7 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @Post("login")
   @HttpCode(HttpStatus.OK)
-  login(@Req() req, @SessionId() sessionId): Promise<AuthResponseDto> {
-    return this.authService.login(req.user, sessionId, req.user?.storeId);
+  login(@CurrentUser() user): Promise<AuthResponseDto> {
+    return this.authService.login(user);
   }
 }

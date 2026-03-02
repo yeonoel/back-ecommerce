@@ -7,7 +7,7 @@ export async function seedProducts(ds: DataSource) {
   const categoryRepo = ds.getRepository(Category);
 
   const categories = await categoryRepo.find();
-  
+
   if (categories.length === 0) {
     throw new Error('Categories not found. Run category seed first.');
   }
@@ -30,17 +30,15 @@ export async function seedProducts(ds: DataSource) {
   ];
 
   for (const productData of products) {
-    const existing = await productRepo.findOne({ 
-      where: { slug: productData.slug } 
+    const existing = await productRepo.findOne({
+      where: { slug: productData.slug }
     });
-    
+
     if (!existing) {
       await productRepo.save(productData);
-      console.log(`✅ Product "${productData.name}" created`);
     } else {
       // Mettre à jour si nécessaire
       await productRepo.update(existing.id, productData);
-      console.log(`ℹ️  Product "${productData.name}" updated`);
     }
   }
 

@@ -23,7 +23,6 @@ export class WebhooksController {
   async handleStripeWebhook(@Req() req: RequestWithRawBody, @Headers('stripe-signature') signature: string) {
     // Vérifier la signature
     const event = this.paymentsService.verifyWebhook(req.rawBody, signature);
-    console.log(`📨 Webhook received: ${event.type}`);
     switch (event.type) {
       case 'payment_intent.succeeded':
         await this.handlePaymentSuccess(event);

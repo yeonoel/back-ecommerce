@@ -1,8 +1,10 @@
 export class UserDataDto {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   phone: string;
+  role?: string;
+  slugStore?: string
 }
 
 

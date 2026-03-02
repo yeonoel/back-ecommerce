@@ -54,7 +54,6 @@ export class StoresController {
   @Post('/invitation/onboarding')
   @HttpCode(HttpStatus.CREATED)
   async onboarding(@Body() dto: OnboardingDto) {
-    console.log('Onboarding DTO:', dto);
     return await this.storesService.onboardVendor(dto);
   }
 }

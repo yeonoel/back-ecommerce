@@ -1,5 +1,5 @@
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
@@ -12,21 +12,24 @@ import { UserRole } from '../users/enum/userRole.enum';
 import { LowStockProductsForProducstStats, OutOfStockProductDto, ProductStatsDto } from '../dashboard/dto/products-stats.dto';
 import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
-import { calculateChange } from 'src/helper/calculChange';
+import { calculateChange } from '../helper/calculChange';
+import { Store } from '../stores/entities/store.entity';
 
 @Injectable()
 export class DashboardService {
   constructor(
     @InjectRepository(Order)
-    private orderRepository: Repository<Order>,
+    private readonly orderRepository: Repository<Order>,
     @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    private readonly productRepository: Repository<Product>,
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(OrderItem)
-    private orderItemRepository: Repository<OrderItem>,
+    private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(ProductVariant)
-    private variantsRepository: Repository<ProductVariant>,
+    private readonly variantsRepository: Repository<ProductVariant>,
+    @InjectRepository(Store)
+    private readonly storeRepository: Repository<Store>,
   ) { }
 
   /* async getStats(): Promise<DashboardStatsDto> {
@@ -86,8 +89,11 @@ export class DashboardService {
     };
   } */
 
-
-  async getStats(): Promise<DashboardStatsDto> {
+  async getStats(slugStore: string, userId: string): Promise<DashboardStatsDto> {
+    const store = await this.storeRepository.findOne({ where: { slug: slugStore, owner: { id: userId } } });
+    if (!store) {
+      throw new NotFoundException('Boutique introuvable');
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -147,12 +153,15 @@ export class DashboardService {
     };
   }
 
-
   /**
  * Statistiques des produits
  * @returns 
  */
-  async getProductsStats(): Promise<ProductStatsDto> {
+  async getProductsStats(slugStore: string, userId: string): Promise<ProductStatsDto> {
+    const store = this.storeRepository.findOne({ where: { slug: slugStore, owner: { id: userId } } });
+    if (!store) {
+      throw new NotFoundException('Boutique introuvable');
+    }
     // Exécuter toutes les requêtes en parallèle pour optimiser
     const [
       totalProducts,
@@ -330,7 +339,6 @@ export class DashboardService {
       };
     });
   }
-
 
   /**
    * Produits bientot en rupture de stock

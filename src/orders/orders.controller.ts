@@ -16,7 +16,7 @@ import { OrderFilterParams } from './dto/order-filter-params.dto';
 import { SessionId } from 'src/common/decorators/session.decorator';
 
 @ApiTags('/orders')
-@Controller('/:storeSlug/orders')
+@Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) { }
@@ -27,54 +27,51 @@ export class OrdersController {
     return await this.ordersService.createOrder(sessionId, createOrderDto, storeSlug);
   }
 
-  @Get('/get-order/:id')
+  @Get('/:storeSlug/get-order/:id')
   async getOrder(@CurrentUser() user: any, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return await this.ordersService.getOrderById(user?.id, orderId, storeSlug);
   }
 
-  @Delete('/cancel-order/:idUser/:id')
+  @Delete('/:storeSlug//cancel-order/:idUser/:id')
   @ApiOperation({ summary: 'Cancel an order' })
   @HttpCode(HttpStatus.OK)
-  async cancelOrder(@CurrentUser() user: any, @Param('idUser') idUser: string, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+  async cancelOrderByClient(@CurrentUser() user: any, @Param('idUser') idUser: string, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return await this.ordersService.cancelOrder(idUser, orderId, storeSlug);
   }
 
-  @Get('/my-orders/all')
+  @Get('/:storeSlug/my-orders/all')
   @ApiOperation({ summary: 'Get my orders (paginated)' })
   async getMyOrders(@CurrentUser() user: any, @Query() paginationDto: PaginationDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
     return await this.ordersService.getUserOrders(user?.id, paginationDto, storeSlug);
   }
 
-  @Patch('dashboard/:id/status')
-  @UseGuards(RolesGuard)
+  @Patch('/:storeSlug/:orderId/status')
   @ApiOperation({ summary: 'Update order status (admin)' })
-  @Roles('admin')
-  async updateOrderStatus(@Param('id') orderId: string, @Body() updateStatusDto: UpdateOrderStatusDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.updateOrderStatus(orderId, updateStatusDto.status, storeSlug);
+  async updateOrderStatusByCustomer(@Param('orderId') orderId: string, @Body() updateStatusDto: UpdateOrderStatusDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return await this.ordersService.updateOrderStatusByCustomer(orderId, updateStatusDto.status, storeSlug);
   }
 
-  @Get('dashboard/all')
+  /** ********************************* ADMIN SELLER ORDERS ************************************ */
+
+  @Patch('dashboard/:storeSlug/:orderId/status')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @ApiOperation({ summary: 'Update order status (admin)' })
+  @Roles('seller')
+  async updateOrderStatusBySeller(@Param('orderId') orderId: string, @Body() updateStatusDto: UpdateOrderStatusDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return await this.ordersService.updateOrderStatusBySeller(orderId, updateStatusDto.status, storeSlug);
+  }
+
+  @Get('dashboard/:storeSlug/all')
+  @UseGuards(RolesGuard)
+  @Roles('seller')
   async getAllOrders(@Query() orderFilterParams: OrderFilterParams, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
     return await this.ordersService.getAllOrders(orderFilterParams, storeSlug);
   }
 
-
   /** *********************************TODO: A supprimer dans la version finale************************************ */
 
-  @Get('dashboard/confirmed-purchase-by-customer/idUser/:id')
-  async confirmedPurchase(@Param('id') id: string, @Param('idUser') idUser: string, @Param('storeSlug') storeSlug: string) {
-    return await this.ordersService.confirmPurchase(id, storeSlug, idUser);
-  }
-
-  @Get('dashboard/Approuved-order-by-seller/:idUser/:id')
-  async approvedOrder(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
-    return await this.ordersService.OrderAprouvedBySeller(id, storeSlug);
-
-  }
-
-  @Get('dashboard/canceled-payment/:idUser/:id')
+  @Patch('dashboard/canceled-payment/:idUser/:id')
+  @Roles('seller')
   async canceledPayment(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
     return await this.ordersService.cancelOrderBySeller(id, storeSlug);
   }

@@ -13,16 +13,12 @@ export class AddressesService {
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
     private readonly dataSource: DataSource
-  ) {}
+  ) { }
 
   async createAddress(userId: string, createAddressDto: CreateAddressDto): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const {isDefault} = createAddressDto;
-      if(isDefault) {
-        await manager.update(Address, {userId}, {isDefault: false});
-      }
-      const newAddress = manager.create(Address, {...createAddressDto, userId});
-      const savedAddress = await manager.save(newAddress); 
+      const newAddress = manager.create(Address, { ...createAddressDto, userId });
+      const savedAddress = await manager.save(newAddress);
 
       return {
         success: true,
@@ -34,8 +30,8 @@ export class AddressesService {
 
   findByUser(userId: string): Promise<Address[]> {
     return this.addressRepository.find({
-          where: {userId},
-          order: {createdAt: 'DESC'}
+      where: { userId },
+      order: { createdAt: 'DESC' }
     })
   }
 
@@ -45,18 +41,7 @@ export class AddressesService {
       if (!address) {
         throw new NotFoundException('Address not found');
       }
-      const {isDefault} = updateAddressDto;
-      if (isDefault) {
-        await manager.update(Address, { userId} , {isDefault: false});
-      }
-      if (!isDefault && address.isDefault) {
-        const otherAddress = await manager.findOne(Address, { where: {userId, id: Not(idAddress)} });
-        if (otherAddress) {
-          otherAddress.isDefault = true;
-          await manager.save(otherAddress);
-        }
-      }
-      await manager.update(Address, { id: idAddress }, {...updateAddressDto});
+      await manager.update(Address, { id: idAddress }, { ...updateAddressDto });
       return {
         success: true,
         message: 'Address deleted successfully',
@@ -71,15 +56,7 @@ export class AddressesService {
       if (!address) {
         throw new NotFoundException('Address not found');
       }
-      const wasDefault = address.isDefault;
       await manager.remove(Address, address);
-      if (wasDefault) {
-        const anotherAddress = await manager.findOne(Address, { where: { userId } });
-        if (anotherAddress) {
-          anotherAddress.isDefault = true;
-          await manager.save(anotherAddress);
-        }
-      }
 
       return {
         success: true,

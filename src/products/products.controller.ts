@@ -46,7 +46,6 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() productUpdateFormDataDto: ProductUpdateFormDataDto,
     @UploadedFiles() files?: Express.Multer.File[]) {
-    console.log('files', productUpdateFormDataDto);
     const updateProductDto = ProductMapper.toUpdateProductDto(productUpdateFormDataDto, []);
     return this.productsService.updateProduct(id, storeSlug, updateProductDto, files);
   }

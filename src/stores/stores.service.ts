@@ -52,7 +52,7 @@ export class StoresService {
 
     // Verifier si la boutique existe
     const storeExists = await this.storeRepository.findOne({ where: { slug } });
-    if (storeExists) throw new ConflictException('Store already exists');
+    if (storeExists) throw new ConflictException('Cette Boutique existe deja');
 
     // Créer la boutique
     const store = this.storeRepository.create({
@@ -94,7 +94,7 @@ export class StoresService {
     );
 
     return {
-      message: 'Store created successfully. Send the WhatsApp link to the vendor.',
+      message: 'Boutique créee avec succes, vous pouvez envoyer le lien WhatsApp au vendeur',
       storeId: store.id,
       storeName: store.name,
       inviteCode: invitation.inviteCode,
@@ -112,7 +112,7 @@ export class StoresService {
   async updateStore(slugStore: string, dto: UpdateStoreDto): Promise<storeResponseDto> {
     const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new NotFoundException('Boutique introuvable');
     }
     Object.assign(store, {
       ...(dto.name && { name: dto.name }),
@@ -124,7 +124,7 @@ export class StoresService {
     await this.storeRepository.save(store);
 
     return {
-      message: 'Store updated successfully',
+      message: 'Boutique mise à jour avec success',
       storeId: store.id,
       storeName: store.name,
     };
@@ -140,12 +140,12 @@ export class StoresService {
   async deleteStore(slugStore: string): Promise<storeResponseDto> {
     const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new NotFoundException('Boutique introuvable');
     }
     store.isDeleted = true;
     await this.storeRepository.save(store);
     return {
-      message: 'Store deleted successfully',
+      message: 'Boutique supprimée avec success',
       storeId: store.id,
       storeName: store.name,
     };
@@ -164,24 +164,19 @@ export class StoresService {
    * @returns {Promise<AuthResponseDto>} - Le compte vendeur créé et le token JWT.
    */
   async onboardVendor(dto: OnboardingDto): Promise<AuthResponseDto> {
-
     // Trouver l'invitation
     const invitation = await this.invitationRepository.findOne({
       where: { inviteCode: dto.inviteCode, status: InvitationStatus.PENDING },
       relations: ['store'],
     });
-
     if (!invitation) {
-      throw new NotFoundException('Invalid or already used invitation code');
+      throw new NotFoundException('Invitation introuvable ou deja utilisée');
     }
-
     // Vérifier expiration
     if (invitation.isExpired) {
       await this.invitationRepository.update(invitation.id, { status: InvitationStatus.EXPIRED });
-      throw new BadRequestException('This invitation has expired');
+      throw new BadRequestException('Cette invitation a expiré');
     }
-
-
     // Créer le compte vendeur
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
     const vendor = this.userRepository.create({
@@ -194,14 +189,16 @@ export class StoresService {
       emailVerified: false,
     });
     await this.userRepository.save(vendor);
-
     // Marquer l'invitation comme acceptée
     await this.invitationRepository.update(invitation.id, {
       status: InvitationStatus.ACCEPTED,
       acceptedBy: vendor,
       acceptedAt: new Date(),
     });
-
+    // Lier le vendeur à la boutique
+    await this.storeRepository.update(invitation.store.id, {
+      owner: vendor,
+    });
     // Activer la boutique
     await this.storeRepository.update(invitation.store.id, {
       status: StoreStatus.ACTIVE,

@@ -13,6 +13,10 @@ export class Store {
     @OneToMany(() => ShopInvitation, (invitation) => invitation.store)
     invitations: ShopInvitation[];
 
+    @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'owner_id' })
+    owner?: User
+
     @Column({ length: 255 })
     name: string;
 

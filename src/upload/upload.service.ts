@@ -42,8 +42,6 @@ export class UploadService {
       return [];
     }
     const uploadPromises = files.map((file) => this.uploadImage(file));
-    console.log(uploadPromises);
-
     return await Promise.all(uploadPromises);
   }
 

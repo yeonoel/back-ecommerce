@@ -38,10 +38,10 @@ export function BuildWhatsappLink(
     return `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`;
 }
 
-export function buildWhatsAppUrl(phoneNumber: string, message: string): string {
+export function buildWhatsAppUrl(phoneNumber?: string, message?: string): string {
     // Nettoyer le numéro (enlever espaces, +, 00)
-    const cleaned = phoneNumber.replace(/[\s+\-()]/g, '').replace(/^00/, '');
-    return `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`;
+    const cleaned = phoneNumber?.replace(/[\s+\-()]/g, '').replace(/^00/, '');
+    return `https://wa.me/${cleaned}?text=${encodeURIComponent(message || '')}`;
 }
 
 // Après createOrder → Client envoie message au vendeur
@@ -59,7 +59,7 @@ export function getWhatsAppRedirectUrl(order: Order, store: Store): string {
         `📍 Ville : ${order.shippingAddressSnapshot?.city}\n\n` +
         `Merci de confirmer ma commande 🙏`;
 
-    return this.buildWhatsAppUrl(store.whatsappNumber, message);
+    return buildWhatsAppUrl(store.whatsappNumber, message);
 }
 
 // Après approbation vendeur → Vendeur envoie message au client
@@ -71,7 +71,7 @@ export function notifyClientByWhatsApp(order: Order, store: Store, clientPhone: 
         `❓ Des questions ? Écrivez-nous directement.\n\n` +
         `Merci de votre confiance 🙏`;
 
-    return this.buildWhatsAppUrl(clientPhone, message);
+    return buildWhatsAppUrl(clientPhone, message);
 }
 
 export function notifySellerNewOrder(order: Order, store: Store): string {
@@ -88,7 +88,7 @@ export function notifySellerNewOrder(order: Order, store: Store): string {
         `📍 ${order.shippingAddressSnapshot?.city}\n\n` +
         `👉 Confirmez vite sur votre dashboard !`;
 
-    return this.buildWhatsAppUrl(store.whatsappNumber, message);
+    return buildWhatsAppUrl(store.whatsappNumber, message);
 }
 
 

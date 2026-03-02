@@ -30,7 +30,7 @@ export class AuthService {
     const user = await this.UsersService.findOneByPhone(phone);
     if (!user) return null;
 
-    const ismatch = await bcrypt.compare(password, user.password);
+    const ismatch = await bcrypt.compare(password, user.password?.toString() ?? 'password124');
     if (!ismatch) return null;
 
     return user
@@ -72,7 +72,7 @@ export class AuthService {
       this.shopCustomerRepository.create({ userId: newUser.id, storeId: store.id }),
     );
 
-    return this.login(newUser, sessionId, store.id);
+    return this.login(newUser);
   }
 
   async
@@ -84,23 +84,25 @@ export class AuthService {
    * @param sessionId 
    * @returns 
    */
-  async login(user: User, sessionId: string, storeId?: string): Promise<AuthResponseDto> {
+  async login(user: User): Promise<AuthResponseDto> {
     user.lastLoginAt = new Date();
-    const payload = await this.buildJwtPayload(user, storeId);
+    const store = await this.storeRepository.findOne({
+      where: { owner: { id: user.id } },
+    });
+    if (!store && user.role === UserRole.SELLER) {
+      throw new NotFoundException('Votre boutique n\'existe pas');
+    }
+    const payload = await this.buildJwtPayload(user);
 
     const token = this.jwtService.sign(payload);
-    if (storeId) {
-      try {
-        this.cartService.mergeGuestCartWithUserCart(user.id, sessionId, storeId);
-      } catch (error) {
-        console.error('failed to merge cart after login:', error);
-      }
-    }
-
-    return this.buildAuthResponse(user, token);
+    return this.buildAuthResponse(user, token, store?.slug);
   }
 
-  private async buildJwtPayload(user: User, storeId?: string): Promise<object> {
+  private async buildJwtPayload(user: User): Promise<object> {
+    // On récupère sa boutique depuis l'invitation acceptée
+    const sellerStore = await this.storeRepository.findOne({
+      where: { owner: { id: user.id } },
+    })
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
         // Le super admin n'est lié à aucune boutique
@@ -110,19 +112,11 @@ export class AuthService {
           role: user.role,
         };
       case UserRole.SELLER: {
-        // Le seller est lié à une boutique via shop_invitations
-        // On récupère sa boutique depuis l'invitation acceptée
-        const sellerStore = await this.storeRepository
-          .createQueryBuilder('store')
-          .innerJoin('store.invitations', 'inv')
-          .where('inv.accepted_by = :userId', { userId: user.id })
-          .getOne();
         return {
           sub: user.id,
           phone: user.phone,
           role: user.role,
-          storeId: sellerStore?.id ?? null,
-          storeSlug: sellerStore?.slug ?? null,
+          slugStore: sellerStore?.slug ?? null,
         };
       }
       case UserRole.CUSTOMER:
@@ -133,19 +127,21 @@ export class AuthService {
           sub: user.id,
           phone: user.phone,
           role: user.role,
-          storeId: storeId ?? null, // boutique active au moment du login
+          slugStore: sellerStore?.slug ?? null, // boutique active au moment du login
         };
     }
   }
 
-  private buildAuthResponse(user: User, token: string): AuthResponseDto {
+  private buildAuthResponse(user: User, token: string, slugStore?: string): AuthResponseDto {
     return {
       success: true,
       data: {
         id: user.id,
+        role: user.role,
         phone: user.phone,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: user.firstName ?? '',
+        lastName: user.lastName ?? '',
+        slugStore: slugStore
       },
       token: token
     };

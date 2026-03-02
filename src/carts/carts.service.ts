@@ -14,6 +14,8 @@ import { CalculationHelper } from '../common/helpers/calculation.helper';
 import { CouponsService } from '../coupons/coupons.service';
 import { ValidateCouponResponseDto } from '../coupons/dto/responses/validate-coupon-response.dto';
 import { Store } from '../stores/entities/store.entity';
+import { User } from 'src/users/entities/user.entity';
+import { UserRole } from 'src/users/enum/userRole.enum';
 
 @Injectable()
 export class CartsService {
@@ -32,12 +34,13 @@ export class CartsService {
    * @param userId Id de l'utilisateur
    * @return Le panier
    */
-  async getOrCreateCart(userId: string | null, sessionId: string, storeSlug: string): Promise<CartDto> {
+  async getOrCreateCart(user: User | null, sessionId: string, storeSlug: string): Promise<CartDto> {
     let cart: Cart | null = null;
     const store = await this.storesRepository.findOne({ where: { slug: storeSlug } });
     if (!store) {
       throw new NotFoundException('Store not found');
     }
+    const userId = user?.role === UserRole.CUSTOMER ? user.id : null;
     if (userId) {
       cart = await this.cartsRepository.findOne({
         where: { user: { id: userId }, store: { slug: storeSlug } },
@@ -72,7 +75,7 @@ export class CartsService {
       });
     } else {
       cart = await this.cartsRepository.findOne({
-        where: { sessionId, user: IsNull() },
+        where: { sessionId, user: IsNull(), store: { slug: storeSlug } },
         relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
       });
 
@@ -102,14 +105,14 @@ export class CartsService {
    * @param createDto Dto avec les infos du produit à ajouter
    * @return Le panier mis à jour
    */
-  async addToCart(userId: string | null, storeId: string, sessionId: string, createDto: CreateOrAddToCartDto): Promise<CartDto> {
+  async addToCart(storeSlug: string, sessionId: string, createDto: CreateOrAddToCartDto): Promise<CartDto> {
     return this.dataSource.transaction(async (manager) => {
-      const store = await manager.findOne(Store, { where: { id: storeId } });
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
       if (!store) {
         throw new NotFoundException('Store not found');
       }
       const product = await manager.findOne(Product, {
-        where: { id: createDto.productId, store: { id: storeId }, isActive: true },
+        where: { id: createDto.productId, store: { slug: storeSlug }, isActive: true },
         relations: ['images'],
       });
       if (!product) {
@@ -120,7 +123,7 @@ export class CartsService {
       let variant: ProductVariant | null = null;
       if (createDto.variantId) {
         variant = await manager.findOne(ProductVariant, {
-          where: { id: createDto.variantId, isActive: true },
+          where: { id: createDto.variantId, product: { id: product.id }, isActive: true },
         });
         if (!variant) {
           throw new NotFoundException('Variant not found or inactive');
@@ -135,41 +138,21 @@ export class CartsService {
       }
       // Récupérer ou créer le panier
       let cart: Cart | null = null;
-      if (userId) {
-        // user connecté
-        const user = await manager.findOne('User', { where: { id: userId } });
-        if (!user) {
-          throw new NotFoundException('User not found');
-        }
-        cart = await manager.findOne(Cart, { where: { user: { id: userId }, store: { id: storeId } } });
-        if (!cart) {
-          cart = await manager.save(Cart, {
-            user,
-            store,
-            sessionId: null,
-            subtotal: 0,
-            tax: 0,
-            shippingCost: 0,
-            discountAmount: 0,
-            total: 0,
-          });
-        }
-      } else {
-        // Invité
-        cart = await manager.findOne(Cart, { where: { sessionId, user: IsNull(), store: { id: storeId } } });
-        if (!cart) {
-          cart = await manager.save(Cart, {
-            user: null,
-            store,
-            sessionId,
-            subtotal: 0,
-            tax: 0,
-            shippingCost: 0,
-            discountAmount: 0,
-            total: 0,
-          });
-        }
+      // Invité
+      cart = await manager.findOne(Cart, { where: { sessionId, user: IsNull(), store: { slug: storeSlug } } });
+      if (!cart) {
+        cart = await manager.save(Cart, {
+          user: null,
+          store,
+          sessionId,
+          subtotal: 0,
+          tax: 0,
+          shippingCost: 0,
+          discountAmount: 0,
+          total: 0,
+        });
       }
+
       // Vérifier si le produit est déjà dans le panier
       const whereClause: any = {
         cart: { id: cart.id },
@@ -210,37 +193,73 @@ export class CartsService {
   }
 
   /**
+  * Retirer un produit du panier
+  * @param userId Id de l'utilisateur
+  * @param sessionId Id de session de l'invité
+  * @param itemId Id de l'item à retirer dans le panier
+  * @return Le panier mis à jour
+  */
+  async removeProductFromCart(storeSlug: string, sessionId: string, productId: string): Promise<CartDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const cart = await manager.findOne(Cart, { where: { sessionId, user: IsNull(), store: { slug: storeSlug } } });
+      if (!cart) {
+        throw new NotFoundException('Cart not found');
+      }
+      const cartItem = await manager.findOne(CartItem, { where: { cart: { id: cart.id }, product: { id: productId } } });
+      if (!cartItem) {
+        throw new NotFoundException('Cart item not found');
+      }
+      await manager.delete(CartItem, { id: cartItem.id });
+      await this.recalculateTotals(cart.id, manager);
+      const updatedCart = await manager.findOne(Cart, {
+        where: { id: cart.id, store: { slug: storeSlug } },
+        relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
+      });
+      if (!updatedCart) {
+        throw new NotFoundException('Cart not found after update');
+      }
+      return mapToCartDto(updatedCart);
+    });
+  }
+
+  /**
    * Modifier la quantité d'un item
    * @param userId Id de l'utilisateur
    * @param itemId Id de l'item à modifier dans le panier
    * @param quantity Nouvelle quantité de l'item
    * @return Le panier mis à jour
    */
-  async updateCartItem(userId: string | null, storeId: string, sessionId: string, itemId: string, quantity: number): Promise<CartDto> {
+  async updateCartProductQuantity(storeSlug: string, sessionId: string, productId: string, quantity: number): Promise<CartDto> {
     return this.dataSource.transaction(async (manager) => {
+      if (quantity < 0) {
+        throw new BadRequestException('Quantity must be greater or equal to 0');
+      }
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const storeId = store.id;
+      const cart = await manager.findOne(Cart, { where: { store: { id: storeId }, sessionId } });
+      if (!cart) {
+        throw new NotFoundException('Cart not found');
+      }
       const cartItem = await manager.findOne(CartItem, {
-        where: { id: itemId },
+        where: { product: { id: productId }, cart: { id: cart.id } },
         relations: ['cart.store', 'cart.user', 'product', 'variant'],
       });
       if (!cartItem) {
         throw new NotFoundException('Cart item not found');
       }
-      // Vérifier ownership
-      if (userId) {
-        if (cartItem.cart.user?.id !== userId && cartItem.cart.store.id === storeId) {
-          throw new BadRequestException('This cart item does not belong to you');
-        }
-      } else {
-        if (cartItem.cart.sessionId !== sessionId && cartItem.cart.store.id === storeId) {
-          throw new BadRequestException('This cart item does not belong to you');
-        }
-      }
 
       if (quantity === 0) {
-        await manager.delete(CartItem, { id: itemId });
+        await manager.delete(CartItem, { id: cartItem.id });
         await this.recalculateTotals(cartItem.cart.id, manager);
         const updatedCart = await manager.findOne(Cart, {
-          where: { id: cartItem.cart.id, store: { id: storeId } },
+          where: { id: cartItem.cart.id, store },
           relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
         });
         if (!updatedCart) {
@@ -266,62 +285,20 @@ export class CartsService {
     });
   }
 
-
-
-  /**
-   * Retirer un produit du panier
-   * @param userId Id de l'utilisateur
-   * @param sessionId Id de session de l'invité
-   * @param itemId Id de l'item à retirer dans le panier
-   * @return Le panier mis à jour
-   */
-  async removeFromCart(userId: string | null, storeId: string, sessionId: string, itemId: string): Promise<CartDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const cartItem = await manager.findOne(CartItem, { where: { id: itemId }, relations: ['cart.store', 'cart.user'] });
-      if (!cartItem) {
-        throw new NotFoundException('Cart item not found');
-      }
-      // Vérifier ownership
-      if (userId) {
-        if (cartItem.cart.user?.id !== userId && cartItem.cart.store?.id === storeId) {
-          throw new BadRequestException('This cart item does not belong to you');
-        }
-      }
-      if (cartItem.cart.sessionId !== sessionId && cartItem.cart.store?.id === storeId) {
-        throw new BadRequestException('This cart item does not belong to you');
-      }
-      const cartId = cartItem.cart.id;
-      await manager.delete(CartItem, { id: itemId });
-      await this.recalculateTotals(cartId, manager);
-      const updatedCart = await manager.findOne(Cart, {
-        where: { id: cartId },
-        relations: ['items', 'items.product', 'items.product.images', 'items.variant'],
-      });
-      if (!updatedCart) {
-        throw new NotFoundException('Cart not found after update');
-      }
-      return mapToCartDto(updatedCart);
-    });
-  }
-
   /**
    * Vider le panier
    * @param userId  Id de l'utilisateur
    * @param sessionId Id de session de l'invité
    * @return void
    */
-  async clearCart(userId: string | null, storeId: string, sessionId: string): Promise<void> {
+  async clearCart(storeSlug: string, sessionId: string): Promise<void> {
     return this.dataSource.transaction(async (manager) => {
-      const store = await manager.findOne(Store, { where: { id: storeId } });
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
       if (!store) {
         throw new NotFoundException('Store not found');
       }
       let cart: Cart | null = null;
-      if (userId) {
-        cart = await manager.findOne(Cart, { where: { user: { id: userId }, store: { id: storeId } } });
-      } else {
-        cart = await manager.findOne(Cart, { where: { sessionId, user: IsNull(), store: { id: storeId } } });
-      }
+      cart = await manager.findOne(Cart, { where: { sessionId, user: IsNull(), store: { slug: storeSlug } } });
       if (!cart) {
         throw new NotFoundException('Cart not found');
       }

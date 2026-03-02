@@ -24,7 +24,6 @@ export async function seedUsers(dataSource: DataSource) {
 
     if (!existing) {
       await userRepository.save(userData);
-      console.log(`✅ User "${userData.phone}" created`);
     } else {
       console.log(`ℹ️  User "${userData.phone}" already exists`);
     }

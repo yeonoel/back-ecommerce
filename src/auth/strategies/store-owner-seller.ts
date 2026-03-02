@@ -23,16 +23,16 @@ export class StoreOwnerGuard implements CanActivate {
             const storeSlugFromRoute = request.params.storeSlug;
 
             if (!storeSlugFromRoute) {
-                throw new ForbiddenException('Store slug is required in route params');
+                throw new ForbiddenException('Le slug de la boutique est requis');
             }
 
             if (user.storeSlug !== storeSlugFromRoute) {
-                throw new ForbiddenException('You can only access your own store dashboard');
+                throw new ForbiddenException('Vous n\'avez pas accès à cette boutique');
             }
 
             return true;
         }
 
-        throw new ForbiddenException('Access denied');
+        throw new ForbiddenException('Access refused');
     }
 }
