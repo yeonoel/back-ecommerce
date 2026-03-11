@@ -9,7 +9,7 @@ export class CreateAddressDto {
 
   @IsString()
   @MaxLength(100)
-  city: string;
+  city?: string;
 
   @IsOptional()
   @IsString()

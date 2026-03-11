@@ -14,14 +14,15 @@ import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-respons
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
 import { SessionId } from 'src/common/decorators/session.decorator';
+import { Public } from 'src/common/decorators/public.decorator';
 
-@ApiTags('/orders')
+@ApiTags('orders')
 @Controller('orders')
-@UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) { }
 
-  @Post()
+  @Post("/create/:storeSlug")
+  @Public()
   @ApiOperation({ summary: 'Create a new order' })
   async createOrder(@SessionId() sessionId: string, @Body() createOrderDto: CreateOrderDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return await this.ordersService.createOrder(sessionId, createOrderDto, storeSlug);
@@ -32,7 +33,7 @@ export class OrdersController {
     return await this.ordersService.getOrderById(user?.id, orderId, storeSlug);
   }
 
-  @Delete('/:storeSlug//cancel-order/:idUser/:id')
+  @Delete('/:storeSlug/cancel-order/:idUser/:id')
   @ApiOperation({ summary: 'Cancel an order' })
   @HttpCode(HttpStatus.OK)
   async cancelOrderByClient(@CurrentUser() user: any, @Param('idUser') idUser: string, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
@@ -46,6 +47,7 @@ export class OrdersController {
   }
 
   @Patch('/:storeSlug/:orderId/status')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update order status (admin)' })
   async updateOrderStatusByCustomer(@Param('orderId') orderId: string, @Body() updateStatusDto: UpdateOrderStatusDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return await this.ordersService.updateOrderStatusByCustomer(orderId, updateStatusDto.status, storeSlug);
@@ -54,7 +56,7 @@ export class OrdersController {
   /** ********************************* ADMIN SELLER ORDERS ************************************ */
 
   @Patch('dashboard/:storeSlug/:orderId/status')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, JwtAuthGuard)
   @ApiOperation({ summary: 'Update order status (admin)' })
   @Roles('seller')
   async updateOrderStatusBySeller(@Param('orderId') orderId: string, @Body() updateStatusDto: UpdateOrderStatusDto, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
@@ -62,7 +64,7 @@ export class OrdersController {
   }
 
   @Get('dashboard/:storeSlug/all')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, JwtAuthGuard)
   @Roles('seller')
   async getAllOrders(@Query() orderFilterParams: OrderFilterParams, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
     return await this.ordersService.getAllOrders(orderFilterParams, storeSlug);
@@ -71,6 +73,7 @@ export class OrdersController {
   /** *********************************TODO: A supprimer dans la version finale************************************ */
 
   @Patch('dashboard/canceled-payment/:idUser/:id')
+  @UseGuards(RolesGuard, JwtAuthGuard)
   @Roles('seller')
   async canceledPayment(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
     return await this.ordersService.cancelOrderBySeller(id, storeSlug);

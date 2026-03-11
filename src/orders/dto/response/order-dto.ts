@@ -5,7 +5,8 @@ import { PaymentStatus } from "src/payments/enums/payment-status.enum";
 export class OrderDto {
   id: string;
   orderNumber: string;
-  userId: string;
+  userId?: string;
+  sessionId?: string;
   status: string;
   paymentStatus: PaymentStatus;
   subtotal: number;

@@ -25,6 +25,8 @@ import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
 import { CartItem } from 'src/cart-items/entities/cart-item.entity';
 import { Coupon } from 'src/coupons/entities/coupon.entity';
 import { CouponUsage } from 'src/coupon-usage/entities/coupon-usage.entity';
+import { CreateOrderItemDto } from 'src/order-items/dto/create-order-item.dto';
+import { ResolvedOrderItem } from './type/ResolvedOrderItem';
 
 @Injectable()
 export class OrdersService {
@@ -47,81 +49,102 @@ export class OrdersService {
       if (!store) {
         throw new NotFoundException('Boutique introuvable');
       }
-      let user = await manager.findOneBy(User, { phone: createOrderDto.address.phone });
+
+      let user = await manager.findOneBy(User, { phone: createOrderDto.address?.phone });
       if (!user) {
         user = await manager.save(User, {
-          phone: createOrderDto.address.phone,
-          firstName: createOrderDto.address.name,
+          phone: createOrderDto.address?.phone,
+          firstName: createOrderDto.address?.name,
           role: UserRole.CUSTOMER,
-        })
+        });
       }
+
       const adress = await manager.findOne(Address, {
         where: {
           userId: user.id,
-          city: createOrderDto.address.city,
-          neighborhood: createOrderDto.address.neighborhood,
+          city: createOrderDto.address?.city,
+          neighborhood: createOrderDto.address?.neighborhood,
         },
       });
       if (!adress) {
         await manager.save(Address, {
           userId: user.id,
           store: store,
-          city: createOrderDto.address.city,
-          neighborhood: createOrderDto.address.neighborhood,
-          user: user
+          city: createOrderDto.address?.city,
+          neighborhood: createOrderDto.address?.neighborhood,
+          user: user,
         });
       }
 
       await manager.upsert(ShopCustomer, { user, store }, { conflictPaths: ['user', 'storeId'] });
 
       const userId = user.id;
-      const cart = await manager.findOne(Cart, {
-        where: { sessionId, store: { slug: storeSlug } },
-        relations: ['items', 'items.product', 'items.variant'],
-      });
-      if (!cart || cart.items.length === 0) {
-        throw new BadRequestException('Le panier est vide');
-      }
-      // vérifier les stocks de tous les items du panier
-      for (const cartItem of cart.items) {
-        let availableStock: number;
-        let productName: string;
-        if (cartItem.variant) {
-          const variant = await manager.findOne(ProductVariant, {
-            where: { id: cartItem.variant.id },
-          });
-          if (!variant) {
-            throw new NotFoundException(`Variant introuvable`);
-          }
-          availableStock = variant.availabledQuantity;
-          productName = `${cartItem.product.name} - ${variant.name}`;
-        } else {
-          availableStock = cartItem.product.availabledQuantity;
-          productName = cartItem.product.name;
+
+      // ✅ Résolution des items : panier OU commande directe
+      let orderItems: ResolvedOrderItem[];
+      let subtotal: number;
+      let tax: number;
+      let shippingCost: number;
+      let discountAmount: number;
+      let total: number;
+      let couponCode: string | null;
+      let cartToDelete: Cart | null = null;
+
+      const hasDirectItems = createOrderDto.items && createOrderDto.items.length > 0;
+
+      if (hasDirectItems) {
+        // ─── CAS COMMANDE DIRECTE (sans panier) ───
+        orderItems = await this.resolveDirectItems(createOrderDto.items, manager);
+        subtotal = orderItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+        tax = 0;
+        shippingCost = createOrderDto.shippingCost ?? 0;
+        discountAmount = 0;
+        couponCode = null;
+        total = subtotal + tax + shippingCost - discountAmount;
+      } else {
+        // ─── CAS PANIER ───
+        const cart = await manager.findOne(Cart, {
+          where: { sessionId, store: { slug: storeSlug } },
+          relations: ['items', 'items.product', 'items.variant'],
+        });
+        if (!cart || cart.items.length === 0) {
+          throw new BadRequestException('Le panier est vide');
         }
-        if (availableStock < cartItem.quantity) {
-          throw new BadRequestException(
-            `Pas suffisant de stock pour  ${productName}. Disponible: ${availableStock}, Demandé: ${cartItem.quantity}`,
-          );
-        }
+        orderItems = cart.items.map((cartItem) => ({
+          product: cartItem.product,
+          variant: cartItem.variant ?? null,
+          quantity: cartItem.quantity,
+          unitPrice: cartItem.price,
+        }));
+        subtotal = cart.subtotal;
+        tax = cart.tax;
+        shippingCost = cart.shippingCost;
+        discountAmount = cart.discountAmount;
+        total = cart.total;
+        couponCode = cart.couponCode;
+        cartToDelete = cart;
       }
+
+      // Vérification des stocks (commun aux deux cas)
+      await this.checkStocks(orderItems, manager);
+
       const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 60); // 60 minutes à partir de maintenant
-      // générer un numéro de commande unique
+      expiresAt.setMinutes(expiresAt.getMinutes() + 60);
+
       const orderNumber = await this.generateOrderNumber(manager);
-      // Préparer les snapshots d'adresse
       const { shippingSnapshot, billingSnapshot, address } = await this.checkAdress(createOrderDto, userId, manager);
+
       const order = await manager.save(Order, {
         orderNumber,
         store,
-        user: user,
+        user,
         paymentStatus: PaymentStatus.PENDING_PAYMENT,
-        subtotal: cart.subtotal,
-        tax: cart.tax,
-        shippingCost: cart.shippingCost,
-        discountAmount: cart.discountAmount,
-        total: cart.total,
-        couponCode: cart.couponCode,
+        subtotal,
+        tax,
+        shippingCost,
+        discountAmount,
+        total,
+        couponCode,
         shippingAddress: address,
         billingAddress: address,
         shippingAddressSnapshot: shippingSnapshot,
@@ -130,36 +153,37 @@ export class OrdersService {
         paymentMethod: createOrderDto.paymentMethod,
         expiresAt,
       });
-      // creer les orders items (Snapshot des produits)
-      for (const cartItem of cart.items) {
-        const product = cartItem.product;
-        const variant = cartItem.variant;
+
+      // ✅ Création des OrderItems (commun aux deux cas)
+      for (const item of orderItems) {
         await manager.save(OrderItem, {
           order: { id: order.id },
-          product: { id: product?.id },
-          variant: { id: variant?.id },
-          productName: product.name,
-          productSku: product.sku,
-          productSlug: product.slug,
-          variantName: variant?.name,
-          quantity: cartItem.quantity,
-          unitPrice: cartItem.price,
-          totalPrice: cartItem.price * cartItem.quantity,
+          product: { id: item.product.id },
+          productVariant: item.variant ? { id: item.variant.id } : null,
+          productName: item.product.name,
+          productSku: item.product.sku,
+          productSlug: item.product.slug,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.unitPrice * item.quantity,
         });
       }
-      // décrémenter les stocks
-      for (const cartItem of cart.items) {
-        if (cartItem.variant?.id) {
-          await manager.increment(ProductVariant, { id: cartItem.variant.id }, 'reservedQuantity', cartItem.quantity);
+
+      // Décrémentation des stocks (commun aux deux cas)
+      for (const item of orderItems) {
+        if (item.variant?.id) {
+          await manager.increment(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
         } else {
-          // Stock géré par produit
-          await manager.increment(Product, { id: cartItem.product.id }, 'reservedQuantity', cartItem.quantity);
+          await manager.increment(Product, { id: item.product.id }, 'reservedQuantity', item.quantity);
         }
       }
-      // vider le panier
-      await manager.delete(CartItem, { cart: { id: cart.id } });
-      await manager.delete(Cart, { id: cart.id });
-      // retourner la commande complète avec les items
+
+      //Suppression du panier uniquement si on est passé par le panier
+      if (cartToDelete) {
+        await manager.delete(CartItem, { cart: { id: cartToDelete.id } });
+        await manager.delete(Cart, { id: cartToDelete.id });
+      }
+
       const fullOrder = await manager.findOne(Order, {
         where: { id: order.id },
         relations: ['items', 'items.product'],
@@ -167,6 +191,7 @@ export class OrdersService {
       if (!fullOrder) {
         throw new NotFoundException('Commande introuvable');
       }
+
       const whatsappUrl = getWhatsAppRedirectUrl(fullOrder, store);
 
       return {
@@ -176,6 +201,49 @@ export class OrdersService {
         whatssappRedirectUrl: whatsappUrl,
       };
     });
+  }
+
+  //Résolution des items directs (récupère Product/Variant depuis la DB)
+  private async resolveDirectItems(items: CreateOrderItemDto[], manager: EntityManager): Promise<ResolvedOrderItem[]> {
+    const resolved: ResolvedOrderItem[] = [];
+    for (const item of items) {
+      const product = await manager.findOne(Product, { where: { id: item.productId } });
+      if (!product) {
+        throw new NotFoundException(`Produit introuvable: ${item.productId}`);
+      }
+      let variant: ProductVariant | null = null;
+      if (item.variantId) {
+        variant = await manager.findOne(ProductVariant, { where: { id: item.variantId } });
+        if (!variant) {
+          throw new NotFoundException(`Variant introuvable: ${item.variantId}`);
+        }
+      }
+      const unitPrice = variant?.price ?? product.price;
+      resolved.push({ product, variant, quantity: item.quantity, unitPrice: unitPrice ?? 0 });
+    }
+    return resolved;
+  }
+
+  //Vérification des stocks extraite en méthode commune
+  private async checkStocks(items: ResolvedOrderItem[], manager: EntityManager): Promise<void> {
+    for (const item of items) {
+      let availableStock: number;
+      let label: string;
+      if (item.variant) {
+        const variant = await manager.findOne(ProductVariant, { where: { id: item.variant.id } });
+        if (!variant) throw new NotFoundException(`Variant introuvable`);
+        availableStock = variant.availabledQuantity;
+        label = `${item.product.name} - ${variant.name}`;
+      } else {
+        availableStock = item.product.availabledQuantity;
+        label = item.product.name;
+      }
+      if (availableStock < item.quantity) {
+        throw new BadRequestException(
+          `Pas suffisant de stock pour ${label}. Disponible: ${availableStock}, Demandé: ${item.quantity}`,
+        );
+      }
+    }
   }
 
 
@@ -536,8 +604,8 @@ export class OrdersService {
     let address = await manager.findOne(Address, {
       where: {
         userId: userId,
-        city: createOrderDto.address.city,
-        neighborhood: createOrderDto.address.neighborhood,
+        city: createOrderDto.address?.city,
+        neighborhood: createOrderDto.address?.neighborhood,
         user: { id: userId }
       },
     });
@@ -545,8 +613,8 @@ export class OrdersService {
     if (!address) {
       address = await manager.save(Address, {
         userId: userId,
-        city: createOrderDto.address.city,
-        neighborhood: createOrderDto.address.neighborhood,
+        city: createOrderDto.address?.city,
+        neighborhood: createOrderDto.address?.neighborhood,
         user: { id: userId }
       });
     }

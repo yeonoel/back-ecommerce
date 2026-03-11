@@ -33,9 +33,10 @@ export class ProductsController {
     return this.productsService.findAllProducts(filters, storeSlug);
   }
 
-  @Get(':id')
-  findBySlug(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
-    return this.productsService.findBySlug(id, storeSlug);
+  @Get(':productSlug')
+  @Public()
+  findBySlug(@Param('productSlug') productSlug: string, @Param('storeSlug') storeSlug: string) {
+    return this.productsService.findBySlug(productSlug, storeSlug);
   }
 
   @Roles('seller')

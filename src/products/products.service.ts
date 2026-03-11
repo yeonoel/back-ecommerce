@@ -313,7 +313,7 @@ export class ProductsService {
     }
   }
 
-  async findBySlug(id: string, storeSlug?: string): Promise<ResponseDto> {
+  async findBySlug(productSlug: string, storeSlug?: string): Promise<ResponseDto> {
     const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
     if (!store) {
       throw new NotFoundException('Boutique introuvable');
@@ -324,7 +324,7 @@ export class ProductsService {
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.variants', 'variants', 'variants.isActive = true')
       .leftJoinAndSelect('product.category', 'category')
-      .where('product.id=:id', { id })
+      .where('product.slug=:productSlug', { productSlug })
       .andWhere('product.isDeleted = false')
       .andWhere('product.isActive = true')
       .getOne();
