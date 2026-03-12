@@ -1,7 +1,7 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 
-// ✅ En prod dotenv ne fait rien si le fichier n'existe pas
+// En prod dotenv ne fait rien si le fichier n'existe pas
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
