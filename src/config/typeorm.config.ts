@@ -1,8 +1,12 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// ✅ En prod dotenv ne fait rien si le fichier n'existe pas
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+}
 
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',
