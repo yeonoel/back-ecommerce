@@ -12,48 +12,49 @@ import { ProductMapper } from './mapper/product-mapper';
 import { Public } from '../common/decorators/public.decorator';
 import { ProductUpdateFormDataDto } from './dto/ProductUpdateFormData.dto';
 
-@ApiTags('Products')
-@Controller('products')
+@ApiTags('products')
+@Controller('/:storeSlug/products')
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
   ) { }
 
-  @Roles('admin')
+  @Roles('seller')
   @Post()
   @UseInterceptors(FilesInterceptor('images', 3))
-  async createProduct(@UploadedFiles() files: Express.Multer.File[], @Body() productFormDataDto: ProductFormDataDto) {
+  async createProduct(@UploadedFiles() files: Express.Multer.File[], @Body() productFormDataDto: ProductFormDataDto, @Param('storeSlug') storeSlug: string) {
     const createProductDto = ProductMapper.toCreateProductDto(productFormDataDto, []);
-    return this.productsService.createProduct(createProductDto, files);
+    return this.productsService.createProduct(createProductDto, storeSlug, files);
   }
 
   @Get()
   @Public()
-  findAllProducts(@Query() filters: ProductFiltersDto) {
-    return this.productsService.findAllProducts(filters);
+  findAllProducts(@Query() filters: ProductFiltersDto, @Param('storeSlug') storeSlug: string) {
+    return this.productsService.findAllProducts(filters, storeSlug);
   }
 
-  @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.productsService.findById(id);
+  @Get(':productSlug')
+  @Public()
+  findBySlug(@Param('productSlug') productSlug: string, @Param('storeSlug') storeSlug: string) {
+    return this.productsService.findBySlug(productSlug, storeSlug);
   }
 
-  @Roles('admin')
+  @Roles('seller')
   @Patch(':id')
   @UseInterceptors(FilesInterceptor('newImages', 3))
   updateProduct(
+    @Param('storeSlug') storeSlug: string,
     @Param('id') id: string,
     @Body() productUpdateFormDataDto: ProductUpdateFormDataDto,
     @UploadedFiles() files?: Express.Multer.File[]) {
-    console.log('files', productUpdateFormDataDto);
     const updateProductDto = ProductMapper.toUpdateProductDto(productUpdateFormDataDto, []);
-    return this.productsService.updateProduct(id, updateProductDto, files);
+    return this.productsService.updateProduct(id, storeSlug, updateProductDto, files);
   }
 
-  @Roles('admin')
+  @Roles('seller')
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  removeProduct(@Param('id') id: string) {
-    return this.productsService.removeProduct(id);
+  removeProduct(@Param('id') id: string, @Param('storeSlug') storeSlug: string) {
+    return this.productsService.removeProduct(id, storeSlug);
   }
 }

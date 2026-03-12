@@ -1,0 +1,120 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class UpdateEntities1771967674596 implements MigrationInterface {
+    name = 'UpdateEntities1771967674596'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TYPE "public"."shop_invitations_status_enum" AS ENUM('pending', 'accepted', 'expired', 'cancelled')`);
+        await queryRunner.query(`CREATE TABLE "shop_invitations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "phone_number" character varying(20) NOT NULL, "vendor_name" character varying(255), "invite_code" character varying(20) NOT NULL, "temp_password" character varying(255) NOT NULL, "status" "public"."shop_invitations_status_enum" NOT NULL DEFAULT 'pending', "expires_at" TIMESTAMP NOT NULL, "accepted_at" TIMESTAMP, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "store_id" uuid NOT NULL, "accepted_by" uuid, CONSTRAINT "UQ_77903b42312cf4cbb26c80b0b09" UNIQUE ("invite_code"), CONSTRAINT "PK_47bfe77059aa63c2164dba321f2" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_shop_invitations_phone" ON "shop_invitations" ("phone_number") `);
+        await queryRunner.query(`CREATE INDEX "idx_shop_invitations_status" ON "shop_invitations" ("status") `);
+        await queryRunner.query(`CREATE INDEX "idx_shop_invitations_invite_code" ON "shop_invitations" ("invite_code") `);
+        await queryRunner.query(`CREATE TYPE "public"."stores_status_enum" AS ENUM('active', 'suspended', 'pending')`);
+        await queryRunner.query(`CREATE TABLE "stores" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying(255) NOT NULL, "slug" character varying NOT NULL, "description" text, "logo_url" text, "whatsapp_number" character varying(20), "status" "public"."stores_status_enum" NOT NULL DEFAULT 'pending', "is_deleted" boolean NOT NULL DEFAULT false, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "created_by" uuid NOT NULL, CONSTRAINT "UQ_790b2968701a6ff5ff383237765" UNIQUE ("slug"), CONSTRAINT "PK_7aa6e7d71fa7acdd7ca43d7c9cb" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_stores_status" ON "stores" ("status") `);
+        await queryRunner.query(`CREATE INDEX "idx_stores_slug" ON "stores" ("slug") `);
+        await queryRunner.query(`CREATE TABLE "shop_customers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "store_id" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "uq_shop_customer" UNIQUE ("user_id", "store_id"), CONSTRAINT "PK_9b19b59ffd13ad09ac91fd76670" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "email"`);
+        await queryRunner.query(`ALTER TABLE "addresses" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "products" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "payments" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "orders" ADD "confirmed_at" TIMESTAMP`);
+        await queryRunner.query(`ALTER TABLE "orders" ADD "approved_at" TIMESTAMP`);
+        await queryRunner.query(`ALTER TABLE "orders" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "reviews" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "notifications" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "coupons" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "carts" ADD "store_id" uuid NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "phone" SET NOT NULL`);
+        await queryRunner.query(`ALTER TYPE "public"."users_role_enum" RENAME TO "users_role_enum_old"`);
+        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('admin', 'customer', 'super_admin', 'seller')`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" TYPE "public"."users_role_enum" USING "role"::"text"::"public"."users_role_enum"`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'customer'`);
+        await queryRunner.query(`DROP TYPE "public"."users_role_enum_old"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "UQ_464f927ae360106b783ed0b4106"`);
+        await queryRunner.query(`ALTER TYPE "public"."orders_status_enum" RENAME TO "orders_status_enum_old"`);
+        await queryRunner.query(`CREATE TYPE "public"."orders_status_enum" AS ENUM('pending_confirmation', 'confirmed_by_client', 'approved_by_seller', 'delivered', 'cancelled')`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" TYPE "public"."orders_status_enum" USING "status"::"text"::"public"."orders_status_enum"`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" SET DEFAULT 'pending_confirmation'`);
+        await queryRunner.query(`DROP TYPE "public"."orders_status_enum_old"`);
+        await queryRunner.query(`CREATE INDEX "idx_products_store" ON "products" ("store_id") `);
+        await queryRunner.query(`ALTER TABLE "product_variants" ADD CONSTRAINT "uq_variant_sku_product" UNIQUE ("sku", "product_id")`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "uq_product_slug_store" UNIQUE ("slug", "store_id")`);
+        await queryRunner.query(`ALTER TABLE "carts" ADD CONSTRAINT "UQ_9952bb0714a4b8fff98c321c1c4" UNIQUE ("session_id", "store_id")`);
+        await queryRunner.query(`ALTER TABLE "carts" ADD CONSTRAINT "UQ_b65a1025061957f5856631e6ade" UNIQUE ("user_id", "store_id")`);
+        await queryRunner.query(`ALTER TABLE "addresses" ADD CONSTRAINT "FK_aa9ec128f509dc22b0402df4212" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "shop_invitations" ADD CONSTRAINT "FK_2b3faca6fe9f7c6d5e356828b26" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "shop_invitations" ADD CONSTRAINT "FK_ad9d75d012b84fbb4b6fa21f19e" FOREIGN KEY ("accepted_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stores" ADD CONSTRAINT "FK_2e3cdd19eb6b671045936b4035e" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "FK_68863607048a1abd43772b314ef" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "shop_customers" ADD CONSTRAINT "FK_23be48b348d58bf4cd2df9a59bc" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "shop_customers" ADD CONSTRAINT "FK_4b28d2ae0148a226bd5da1ad3cb" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "payments" ADD CONSTRAINT "FK_8afabeaa460738befe497e857c7" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "orders" ADD CONSTRAINT "FK_b7a7bb813431fc7cd73cced0001" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "reviews" ADD CONSTRAINT "FK_53d569324f429e5d3af161f1657" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "notifications" ADD CONSTRAINT "FK_892a09437f1c88c2a8741dad6ae" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "coupons" ADD CONSTRAINT "FK_541e70be595a5839bcd23756257" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "carts" ADD CONSTRAINT "FK_40adab2d2921a344e92a3db449d" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "carts" DROP CONSTRAINT "FK_40adab2d2921a344e92a3db449d"`);
+        await queryRunner.query(`ALTER TABLE "coupons" DROP CONSTRAINT "FK_541e70be595a5839bcd23756257"`);
+        await queryRunner.query(`ALTER TABLE "notifications" DROP CONSTRAINT "FK_892a09437f1c88c2a8741dad6ae"`);
+        await queryRunner.query(`ALTER TABLE "reviews" DROP CONSTRAINT "FK_53d569324f429e5d3af161f1657"`);
+        await queryRunner.query(`ALTER TABLE "orders" DROP CONSTRAINT "FK_b7a7bb813431fc7cd73cced0001"`);
+        await queryRunner.query(`ALTER TABLE "payments" DROP CONSTRAINT "FK_8afabeaa460738befe497e857c7"`);
+        await queryRunner.query(`ALTER TABLE "shop_customers" DROP CONSTRAINT "FK_4b28d2ae0148a226bd5da1ad3cb"`);
+        await queryRunner.query(`ALTER TABLE "shop_customers" DROP CONSTRAINT "FK_23be48b348d58bf4cd2df9a59bc"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "FK_68863607048a1abd43772b314ef"`);
+        await queryRunner.query(`ALTER TABLE "stores" DROP CONSTRAINT "FK_2e3cdd19eb6b671045936b4035e"`);
+        await queryRunner.query(`ALTER TABLE "shop_invitations" DROP CONSTRAINT "FK_ad9d75d012b84fbb4b6fa21f19e"`);
+        await queryRunner.query(`ALTER TABLE "shop_invitations" DROP CONSTRAINT "FK_2b3faca6fe9f7c6d5e356828b26"`);
+        await queryRunner.query(`ALTER TABLE "addresses" DROP CONSTRAINT "FK_aa9ec128f509dc22b0402df4212"`);
+        await queryRunner.query(`ALTER TABLE "carts" DROP CONSTRAINT "UQ_b65a1025061957f5856631e6ade"`);
+        await queryRunner.query(`ALTER TABLE "carts" DROP CONSTRAINT "UQ_9952bb0714a4b8fff98c321c1c4"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "uq_product_slug_store"`);
+        await queryRunner.query(`ALTER TABLE "product_variants" DROP CONSTRAINT "uq_variant_sku_product"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_products_store"`);
+        await queryRunner.query(`CREATE TYPE "public"."orders_status_enum_old" AS ENUM('pending_payment', 'confirmed', 'payment_failed', 'expired', 'processing', 'shipped', 'delivered', 'cancelled')`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" TYPE "public"."orders_status_enum_old" USING "status"::"text"::"public"."orders_status_enum_old"`);
+        await queryRunner.query(`ALTER TABLE "orders" ALTER COLUMN "status" SET DEFAULT 'pending_payment'`);
+        await queryRunner.query(`DROP TYPE "public"."orders_status_enum"`);
+        await queryRunner.query(`ALTER TYPE "public"."orders_status_enum_old" RENAME TO "orders_status_enum"`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "UQ_464f927ae360106b783ed0b4106" UNIQUE ("slug")`);
+        await queryRunner.query(`CREATE TYPE "public"."users_role_enum_old" AS ENUM('admin', 'customer', 'seller')`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" TYPE "public"."users_role_enum_old" USING "role"::"text"::"public"."users_role_enum_old"`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'customer'`);
+        await queryRunner.query(`DROP TYPE "public"."users_role_enum"`);
+        await queryRunner.query(`ALTER TYPE "public"."users_role_enum_old" RENAME TO "users_role_enum"`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "phone" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "carts" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "coupons" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "notifications" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "reviews" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN "approved_at"`);
+        await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN "confirmed_at"`);
+        await queryRunner.query(`ALTER TABLE "payments" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "addresses" DROP COLUMN "store_id"`);
+        await queryRunner.query(`ALTER TABLE "users" ADD "email" character varying(255) NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email")`);
+        await queryRunner.query(`DROP TABLE "shop_customers"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_stores_slug"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_stores_status"`);
+        await queryRunner.query(`DROP TABLE "stores"`);
+        await queryRunner.query(`DROP TYPE "public"."stores_status_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_shop_invitations_invite_code"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_shop_invitations_status"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_shop_invitations_phone"`);
+        await queryRunner.query(`DROP TABLE "shop_invitations"`);
+        await queryRunner.query(`DROP TYPE "public"."shop_invitations_status_enum"`);
+    }
+
+}

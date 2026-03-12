@@ -1,13 +1,6 @@
+import { Store } from '../../stores/entities/store.entity';
 import { User } from '../../users/entities/user.entity';
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  Index,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, } from 'typeorm';
 
 @Entity('notifications')
 @Index('idx_notifications_user_id', ['user'])
@@ -19,6 +12,10 @@ export class Notification {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store
 
   @Column({ length: 50 })
   type: string;

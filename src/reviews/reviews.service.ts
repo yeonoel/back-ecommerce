@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException,ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
@@ -29,9 +29,9 @@ export class ReviewsService {
     private orderItemRepository: Repository<OrderItem>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
-  ) {}
+  ) { }
 
-  async create(productId: string,userId: string,createReviewDto: CreateReviewDto): Promise<Review> {
+  async create(productId: string, userId: string, createReviewDto: CreateReviewDto): Promise<Review> {
     const product = await this.productRepository.findOne({
       where: { id: productId },
     });
@@ -128,8 +128,8 @@ export class ReviewsService {
    * @param updateReviewDto 
    * @return ResponseDto
    */
-  async update(id: string,userId: string, updateReviewDto: UpdateReviewDto): Promise<ResponseDto<Review>> {
-    const review = await this.reviewRepository.findOne({where: { id },relations: ['user'],});
+  async update(id: string, userId: string, updateReviewDto: UpdateReviewDto): Promise<ResponseDto<Review>> {
+    const review = await this.reviewRepository.findOne({ where: { id }, relations: ['user'], });
     if (!review) {
       throw new NotFoundException(`Review not found`);
     }
@@ -145,12 +145,12 @@ export class ReviewsService {
     return {
       success: true,
       message: 'Review updated successfully',
-      data: review 
+      data: review
     }
   }
 
   async remove(id: string, userId: string, isAdmin: boolean = false): Promise<void> {
-    const review = await this.reviewRepository.findOne({where: { id },relations: ['user'],});
+    const review = await this.reviewRepository.findOne({ where: { id }, relations: ['user'], });
     if (!review) {
       throw new NotFoundException(`Review not found`);
     }
@@ -166,26 +166,26 @@ export class ReviewsService {
    * @param isApproved 
    * @return ResponseDto
    */
- async updateApprovalStatus(id: string, isApproved: boolean): Promise<ResponseDto<Review>> {
-  const review = await this.reviewRepository.findOne({ where: { id } });
-  if (!review) {
-    throw new NotFoundException('Review not found');
+  async updateApprovalStatus(id: string, isApproved: boolean): Promise<ResponseDto<Review>> {
+    const review = await this.reviewRepository.findOne({ where: { id } });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    review.isApproved = isApproved;
+    await this.reviewRepository.save(review);
+    return {
+      success: true,
+      message: isApproved ? 'Review approved successfully' : 'Review rejected successfully',
+      data: review,
+    };
   }
-  review.isApproved = isApproved;
-  await this.reviewRepository.save(review);
-  return {
-    success: true,
-    message: isApproved ? 'Review approved successfully' : 'Review rejected successfully',
-    data: review,
-  };
-}
 
-/**
- * Récupérer les avis en attente de modération
- * @param page 
- * @param limit 
- * @return PaginatedResponseDto
- */
+  /**
+   * Récupérer les avis en attente de modération
+   * @param page 
+   * @param limit 
+   * @return PaginatedResponseDto
+   */
   async findPendingReviews(pagination: PaginationDto): Promise<PaginatedResponseDto<Review>> {
     const { page, limit } = pagination;
     const [reviews, total] = await this.reviewRepository.findAndCount({
@@ -305,8 +305,8 @@ export class ReviewsService {
       isVerifiedPurchase: review.isVerifiedPurchase,
       isApproved: review.isApproved,
       author: {
-        firstName: review.user.firstName,
-        lastNameInitial: review.user.lastName ? `${review.user.lastName.charAt(0)}.` : '',
+        firstName: review.user?.firstName ?? '',
+        lastNameInitial: review.user?.lastName ? `${review.user.lastName.charAt(0)}.` : '',
       },
       createdAt: review.createdAt,
       updatedAt: review.updatedAt,

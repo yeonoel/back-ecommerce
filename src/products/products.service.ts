@@ -4,17 +4,19 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { DataSource, EntityManager, Not, Repository } from 'typeorm';
-import { ResponseDto } from 'src/common/dto/responses/Response.dto';
-import { ProductImage } from 'src/products-images/entities/products-image.entity';
-import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
-import { generateSlug } from 'src/common/utils/slug.util';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
+import { ProductImage } from '../products-images/entities/products-image.entity';
+import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { generateSku, generateVariantSku } from '../common/utils/sku.util';
 import { CreateProductVariantDto } from '../product-variants/dto/create-product-variant.dto';
 import { ProductFiltersDto } from './dto/product-filters-dto';
 import { ResponseFilterDto } from './dto/response-filter.dto';
 import { UploadService } from '../upload/upload.service';
-import { OrderItem } from 'src/order-items/entities/order-item.entity';
-import { OrderStatus } from 'src/orders/enums/order-status.enum';
+import { OrderItem } from '../order-items/entities/order-item.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { nanoid } from 'nanoid/non-secure';
+import { Store } from 'src/stores/entities/store.entity';
+import { createSharingLinkOnSocialMedia } from 'src/common/helpers/buildWhatssapLink';
 
 @Injectable()
 export class ProductsService {
@@ -24,19 +26,23 @@ export class ProductsService {
     private readonly dataSource: DataSource,
     private readonly uploadService: UploadService
   ) { }
-  async createProduct(createDto: CreateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
+  async createProduct(createDto: CreateProductDto, slugStore: string, files?: Express.Multer.File[]): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const slug = generateSlug(createDto.name);
-      const existing = await manager.findOne(Product, { where: { slug } });
+      const store = await manager.findOne(Store, { where: { slug: slugStore } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+      const slug = await this.generateUniqueProductSlug(createDto.name, slugStore);
+      const existing = await manager.findOne(Product, { where: { slug, store: { slug: slugStore } } });
       if (existing) {
-        throw new ConflictException('slug by name already exists');
+        throw new ConflictException('Le slug existe deja');
       }
       if (createDto.sku) {
         const skuExists = await manager.findOne(Product, {
-          where: { sku: createDto.sku },
+          where: { sku: createDto.sku, store: { slug: slugStore } },
         });
         if (skuExists) {
-          throw new ConflictException('sku already exists');
+          throw new ConflictException('sku existe deja');
         }
       } else {
         createDto.sku = generateSku(createDto.name);
@@ -48,11 +54,12 @@ export class ProductsService {
         try {
           imageUrls = await this.uploadService.uploadMultipleImages(files);
         } catch (error) {
-          throw new BadRequestException(`Image upload failed: ${error.message}`);
+          throw new BadRequestException(`upload de l'image échoué: ${error.message}`);
         }
       }
       const product = await manager.save(Product, {
         name: createDto.name,
+        store,
         slug,
         description: createDto.description,
         shortDescription: createDto.shortDescription,
@@ -93,7 +100,7 @@ export class ProductsService {
 
             if (variantSkuExists) {
               throw new ConflictException(
-                `Variant SKU already exists: ${variantSku}`,
+                `Il existe deja un variant avec le sku: ${variantSku}`,
               );
             }
           }
@@ -125,14 +132,20 @@ export class ProductsService {
       }
 
       const fullProduct = await manager.findOne(Product, {
-        where: { id: product.id },
+        where: { id: product.id, store: { slug: slugStore } },
         relations: ['images', 'variants', 'category'],
       });
 
+      if (!fullProduct) {
+        throw new NotFoundException('Produit introuvable');
+      }
+
+      const sharingLinks = createSharingLinkOnSocialMedia(fullProduct.slug, slugStore);
+
       return {
         success: true,
-        message: 'Product created successfully',
-        data: fullProduct
+        message: 'Produit cree avec success',
+        data: { ...fullProduct, sharingLinks }
       }
     });
   }
@@ -245,10 +258,15 @@ export class ProductsService {
    * @param filters The filters to apply to the search
    * @returns A promise with a response containing the found products, and their total count
    */
-  async findAllProducts(filters: ProductFiltersDto): Promise<ResponseFilterDto> {
+  async findAllProducts(filters: ProductFiltersDto, storeSlug: string): Promise<ResponseFilterDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Boutique introuvable');
+    }
     const { category, minPrice, maxPrice, search, inStock, isFeatured, sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 20 } = filters;
     const query = this.productRepository
       .createQueryBuilder('product')
+      .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
       .leftJoinAndSelect('product.images', 'images')
       .leftJoinAndSelect('product.variants', 'variants', 'variants.isDeleted = false AND variants.isActive = true')
       .where('product.isDeleted = false')
@@ -280,11 +298,11 @@ export class ProductsService {
     query.orderBy(`product.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     //📄 PAGINATION
     const skip = (page - 1) * limit;
-    query.skip(skip).limit(limit);
+    query.skip(skip).take(limit);
     const [items, total] = await query.getManyAndCount();
     return {
       success: true,
-      message: 'Products found successfully',
+      message: 'Produits trouvés avec succès',
       data: items,
       meta: {
         total,
@@ -295,28 +313,29 @@ export class ProductsService {
     }
   }
 
-  async findById(id: string): Promise<ResponseDto> {
+  async findBySlug(productSlug: string, storeSlug?: string): Promise<ResponseDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Boutique introuvable');
+    }
     const product = await this.productRepository
       .createQueryBuilder('product')
+      .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect(
-        'product.variants',
-        'variants',
-        'variants.isActive = true',
-      )
+      .leftJoinAndSelect('product.variants', 'variants', 'variants.isActive = true')
       .leftJoinAndSelect('product.category', 'category')
-      .where('product.id=:id', { id })
+      .where('product.slug=:productSlug', { productSlug })
       .andWhere('product.isDeleted = false')
       .andWhere('product.isActive = true')
       .getOne();
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException('Produit introuvable');
     }
 
     return {
       success: true,
-      message: 'Product found successfully',
+      message: 'Produit trouvé avec succès',
       data: {
         ...product,
         isOnSale: product.isOnSale,
@@ -336,32 +355,36 @@ export class ProductsService {
    * @throws NotFoundException If the product is not found
    * @throws ConflictException If the SKU already exists
    */
-  async updateProduct(id: string, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
+  async updateProduct(id: string, storeSlug: string, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
       const product = await manager.findOne(Product, {
-        where: { id },
+        where: { id, store: { slug: storeSlug } },
         relations: ['images', 'variants'],
       });
-      if (!product) throw new NotFoundException('Product not found');
+      if (!product) throw new NotFoundException('Produit introuvable');
       if (updateProductDto.sku && updateProductDto.sku !== product.sku) {
         const skuExists = await manager.findOne(Product, { where: { sku: updateProductDto.sku } });
-        if (skuExists) throw new ConflictException('SKU already exists');
+        if (skuExists) throw new ConflictException('Le sku existe deja');
         product.sku = updateProductDto.sku;
       }
       Object.assign(product, {
-        name: updateProductDto.name ?? product.name,
-        description: updateProductDto.description ?? product.description,
-        shortDescription: updateProductDto.shortDescription ?? product.shortDescription,
-        price: updateProductDto.price ?? product.price,
-        compareAtPrice: updateProductDto.compareAtPrice ?? product.compareAtPrice,
-        costPrice: updateProductDto.costPrice ?? product.costPrice,
-        stockQuantity: updateProductDto.stockQuantity ?? product.stockQuantity,
-        isFeatured: updateProductDto.isFeatured ?? product.isFeatured,
-        weight: updateProductDto.weight ?? product.weight,
-        length: updateProductDto.length ?? product.length,
-        width: updateProductDto.width ?? product.width,
-        height: updateProductDto.height ?? product.height,
-        isActive: product.isActive,
+        ...(updateProductDto.name && { name: updateProductDto.name }),
+        ...(updateProductDto.description && { description: updateProductDto.description }),
+        ...(updateProductDto.shortDescription && { shortDescription: updateProductDto.shortDescription }),
+        ...(updateProductDto.price && { price: updateProductDto.price }),
+        ...(updateProductDto.compareAtPrice && { compareAtPrice: updateProductDto.compareAtPrice }),
+        ...(updateProductDto.costPrice && { costPrice: updateProductDto.costPrice }),
+        ...(updateProductDto.stockQuantity && { stockQuantity: updateProductDto.stockQuantity }),
+        ...(updateProductDto.isFeatured && { isFeatured: updateProductDto.isFeatured }),
+        ...(updateProductDto.weight && { weight: updateProductDto.weight }),
+        ...(updateProductDto.length && { length: updateProductDto.length }),
+        ...(updateProductDto.width && { width: updateProductDto.width }),
+        ...(updateProductDto.height && { height: updateProductDto.height }),
+        ...(updateProductDto.isActive && { isActive: updateProductDto.isActive }),
       });
 
       await manager.save(product);
@@ -417,14 +440,14 @@ export class ProductsService {
         }
       } */
       const updatedProduct = await manager.findOne(Product, {
-        where: { id },
+        where: { id, store: { slug: storeSlug } },
         relations: ['images', 'variants', 'category'],
       });
-      if (!updatedProduct) throw new NotFoundException('Product not found');
+      if (!updatedProduct) throw new NotFoundException('Produit introuvable');
 
       return {
         success: true,
-        message: 'Product updated successfully',
+        message: 'Produit mis à jour avec succès',
         data: updatedProduct,
       };
     });
@@ -530,18 +553,22 @@ export class ProductsService {
   
   */
 
-  async removeProduct(id: string): Promise<ResponseDto> {
+  async removeProduct(id: string, storeSlug: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(Product, { where: { id } });
-      if (!product) throw new NotFoundException('Product not found');
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+      const product = await manager.findOne(Product, { where: { id, store: { slug: storeSlug } } });
+      if (!product) throw new NotFoundException('Produit introuvable');
       const existOrderItem = await manager.exists(OrderItem, { where: { product: { id }, order: { status: Not(OrderStatus.CANCELLED) } } });
-      if (existOrderItem) throw new ConflictException('Cannot delete linked to active or paid order');
+      if (existOrderItem) throw new ConflictException('Impossible de supprimer un produit lié à une commande en cours ou payée');
       const hasEnyOrder = await manager.exists(OrderItem, { where: { product: { id } } });
       if (hasEnyOrder) {
         await manager.remove(product);
         return {
           success: true,
-          message: 'Product deleted successfully',
+          message: 'Produit supprimé avec succès',
           data: product,
         };
       }
@@ -549,7 +576,7 @@ export class ProductsService {
       await manager.save(product);
       return {
         success: true,
-        message: 'Product deleted successfully',
+        message: 'Produit supprimé avec succès',
         data: product,
       };
     });
@@ -565,7 +592,7 @@ export class ProductsService {
       const key = `${variant.name}-${variant.color ?? ''}-${variant.size ?? ''}`;
 
       if (set.has(key)) {
-        throw new ConflictException(`Duplicate variant detected (color: ${variant.color}, size: ${variant.size})`,
+        throw new ConflictException(`Cette variant existe déjà (color: ${variant.color}, size: ${variant.size})`,
         );
       }
       set.add(key);
@@ -602,5 +629,45 @@ export class ProductsService {
       }
       await manager.save(images);
     }
+  }
+
+  private async generateUniqueProductSlug(
+    name: string,
+    storeSlug: string,
+    currentProductId?: string,
+  ): Promise<string> {
+    const baseSlug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')   // supprime les accents
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    let slug = baseSlug;
+    let attempt = 0;
+
+    while (attempt < 10) {
+      const query = this.productRepository
+        .createQueryBuilder('product')
+        .innerJoin('product.store', 'store', 'store.slug = :storeSlug', { storeSlug })
+        .where('product.slug = :slug', { slug })
+
+      // En cas d'UPDATE, exclure le produit en cours de modification
+      if (currentProductId) {
+        query.andWhere('product.id != :id', { id: currentProductId });
+      }
+
+      const existing = await query.getOne();
+
+      if (!existing) break; // slug disponible dans cette boutique
+
+      attempt++;
+      slug = `${baseSlug}-${nanoid(5).toLowerCase()}`;
+    }
+    if (attempt === 10) {
+      throw new ConflictException('Impossible de trouver un slug unique');
+    }
+
+    return slug;
   }
 }

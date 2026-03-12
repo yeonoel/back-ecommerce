@@ -9,10 +9,11 @@ import { generateSku } from 'src/common/utils/sku.util';
 import { OrderItem } from 'src/order-items/entities/order-item.entity';
 import { not } from 'rxjs/internal/util/not';
 import { OrderStatus } from 'src/orders/enums/order-status.enum';
+import { Store } from 'src/stores/entities/store.entity';
 
 @Injectable()
 export class ProductVariantsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource) { }
   /**
    * Create a variant for a product
    * @param productId The id of the product
@@ -21,9 +22,13 @@ export class ProductVariantsService {
    * @throws NotFoundException If the product is not found
    * @throws ConflictException If the variant SKU already exists
    */
-  async create(productId: string, createProductVariantDto: CreateProductVariantDto): Promise<ResponseDto> {
+  async create(productId: string, createProductVariantDto: CreateProductVariantDto, storeSlug: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      const product = await manager.findOne(Product, { where: { id: productId }, relations: ['variants'] });
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const product = await manager.findOne(Product, { where: { id: productId, store: { slug: storeSlug } }, relations: ['variants'] });
       if (!product) throw new NotFoundException('Product not found');
       if (product.variants.length === 1 && product.variants[0].color === 'Default' && product.variants[0].size === 'Default') {
         await manager.delete(ProductVariant, { id: product.variants[0].id });
@@ -43,14 +48,18 @@ export class ProductVariantsService {
     });
   }
 
-/**
- * Find all variants for a product
- * @param productId The id of the product
- * @returns A response with the found variants
- */
-  async findAll(productId: string): Promise<ResponseDto> {
+  /**
+   * Find all variants for a product
+   * @param productId The id of the product
+   * @returns A response with the found variants
+   */
+  async findAll(productId: string, storeSlug: string): Promise<ResponseDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
     const variants = await this.dataSource.getRepository(ProductVariant).find({
-      where: { product: { id: productId } },
+      where: { product: { id: productId, store: { slug: storeSlug } } },
     });
 
     return {
@@ -60,14 +69,18 @@ export class ProductVariantsService {
     }
   }
 
-/**
- * Finds a variant by its ID
- * @param id The ID of the variant to find
- * @returns A response with the found variant
- * @throws NotFoundException If the variant is not found
- */
-  async findOne(id: string): Promise<ResponseDto> {
-    const variant = await this.dataSource.getRepository(ProductVariant).findOne({ where: { id } });
+  /**
+   * Finds a variant by its ID
+   * @param id The ID of the variant to find
+   * @returns A response with the found variant
+   * @throws NotFoundException If the variant is not found
+   */
+  async findOne(id: string, storeSlug: string): Promise<ResponseDto> {
+    const store = await this.dataSource.getRepository(Store).findOne({ where: { slug: storeSlug } });
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+    const variant = await this.dataSource.getRepository(ProductVariant).findOne({ where: { id, product: { store: { slug: storeSlug } } } });
     if (!variant) throw new NotFoundException('Variant not found');
     return {
       success: true,
@@ -84,15 +97,25 @@ export class ProductVariantsService {
    * @throws NotFoundException si le variant n'existe pas
    * @throws ConflictException si le SKU existe deja
    */
-  async update(id: string, updateProductVariantDto: UpdateProductVariantDto): Promise<ResponseDto> {
+  async update(id: string, updateProductVariantDto: UpdateProductVariantDto, storeSlug: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      const variant = await manager.findOne(ProductVariant, { where: { id }, relations: ['product'] });
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const variant = await manager.findOne(ProductVariant, { where: { id, product: { store: { slug: storeSlug } } }, relations: ['product'] });
       if (!variant) throw new NotFoundException('Variant not found');
       if (updateProductVariantDto.sku && updateProductVariantDto.sku !== variant.sku) {
         const exists = await manager.findOne(ProductVariant, { where: { sku: updateProductVariantDto.sku } });
         if (exists) throw new ConflictException('Variant SKU already exists');
       }
-      Object.assign(variant, updateProductVariantDto);
+      Object.assign(variant, {
+        ...(updateProductVariantDto.color && { color: updateProductVariantDto.color }),
+        ...(updateProductVariantDto.size && { size: updateProductVariantDto.size }),
+        ...(updateProductVariantDto.price && { price: updateProductVariantDto.price }),
+        ...(updateProductVariantDto.stockQuantity && { stockQuantity: updateProductVariantDto.stockQuantity }),
+        ...(updateProductVariantDto.sku && { sku: updateProductVariantDto.sku }),
+      });
       const savedVariant = await manager.save(variant);
       return {
         success: true,
@@ -103,20 +126,26 @@ export class ProductVariantsService {
   }
 
 
-/**
- * Deletes a variant by its ID
- * @param id The ID of the variant to delete
- * @returns A response with the deleted variant
- * @throws NotFoundException If the variant is not found
- * @throws ConflictException If the variant is linked to an active or paid order
- */
-  async remove(id: string): Promise<ResponseDto> {
+  /**
+   * Deletes a variant by its ID
+   * @param id The ID of the variant to delete
+   * @returns A response with the deleted variant
+   * @throws NotFoundException If the variant is not found
+   * @throws ConflictException If the variant is linked to an active or paid order
+   */
+  async remove(id: string, storeSlug: string): Promise<ResponseDto> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      const variant = await manager.findOne(ProductVariant, { where: { id } });
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+      const variant = await manager.findOne(ProductVariant, { where: { id, product: { store: { slug: storeSlug } } } });
       if (!variant) throw new NotFoundException('Variant not found');
-      const existOrderItem = await manager.exists(OrderItem, { 
-        where: { variant: { id },
-        order: { status: Not(OrderStatus.CANCELLED) } } 
+      const existOrderItem = await manager.exists(OrderItem, {
+        where: {
+          variant: { id },
+          order: { status: Not(OrderStatus.CANCELLED) }
+        }
       });
       if (existOrderItem) throw new ConflictException('Cannot delete linked to active or paid order');
 

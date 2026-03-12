@@ -18,7 +18,6 @@ export class ProductMapper {
       imagesMeta = JSON.parse(form.imagesMeta);
     }
 
-    console.log('imagesMeta', imagesMeta);
     return {
       name: form.name,
       description: form.description,
@@ -78,12 +77,6 @@ export class ProductMapper {
     const variants = safeJsonParse<CreateProductVariantDto[] | undefined>(form.variants, undefined);
     const imagesMeta = safeJsonParse<ImagesMetaDto[]>(form.imagesMeta, []);
     const imagesToDelete = safeJsonParse<string[] | undefined>(form.imagesToDelete, undefined);
-
-    console.log('🔄 Mapper - Parsing:', {
-      hasVariants: !!variants,
-      hasImagesMeta: imagesMeta.length > 0,
-      imagesToDeleteCount: imagesToDelete?.length || 0
-    });
 
     // Construire le DTO de manière propre
     const updateDto: UpdateProductDto = {

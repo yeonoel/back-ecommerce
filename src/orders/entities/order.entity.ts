@@ -6,6 +6,7 @@ import { User } from '../../users/entities/user.entity';
 import { OrderStatus } from '../enums/order-status.enum';
 import { PaymentStatus } from '../../payments/enums/payment-status.enum';
 import { Shipment } from '../../shipments/entities/shipment.entity';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('orders')
 @Index('idx_orders_order_number', ['orderNumber'])
@@ -23,6 +24,10 @@ export class Order {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store
+
   @OneToMany(() => Payment, payment => payment.order)
   payments: Payment[];
 
@@ -32,7 +37,7 @@ export class Order {
   @OneToMany(() => OrderItem, orderItem => orderItem.order)
   items: OrderItem[];
 
-  @Column({ default: OrderStatus.PENDING_PAYMENT, type: 'enum', enum: OrderStatus })
+  @Column({ default: OrderStatus.PENDING_CONFIRMATION, type: 'enum', enum: OrderStatus })
   status: OrderStatus;
 
   @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })
@@ -87,6 +92,14 @@ export class Order {
 
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt?: Date;
+
+  // confirmed by client
+  @Column({ name: 'confirmed_at', type: 'timestamp', nullable: true })
+  confirmedAt?: Date;
+
+  // approved by seller
+  @Column({ name: 'approved_at', type: 'timestamp', nullable: true })
+  approvedAt?: Date;
 
   @Column({ name: 'shipped_at', type: 'timestamp', nullable: true })
   shippedAt?: Date;

@@ -3,36 +3,20 @@ import { AddressType } from '../enums/address-type.enum';
 
 export class CreateAddressDto {
   @IsOptional()
-  @IsEnum(AddressType)
-  addressType?: AddressType = AddressType.SHIPPING;
-
-  @IsOptional()
-  @IsBoolean()
-  isDefault?: boolean = false;
+  @IsString()
+  @MaxLength(100)
+  neighborhood?: string;
 
   @IsString()
-  @MaxLength(255)
-  streetAddress: string;
+  @MaxLength(100)
+  city?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  apartment?: string;
-
-  @IsString()
-  @MaxLength(100)
-  city: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  state?: string;
+  name?: string;
 
   @IsString()
   @MaxLength(20)
-  postalCode: string;
-
-  @IsString()
-  @MaxLength(100)
-  country: string;
+  phone: string;
 }

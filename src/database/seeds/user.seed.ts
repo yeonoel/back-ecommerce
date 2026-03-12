@@ -8,38 +8,24 @@ export async function seedUsers(dataSource: DataSource) {
 
   const users = [
     {
-      email: 'admin@test.com',
       password: await bcrypt.hash('password123', 10),
-      firstName: 'Admin',
-      lastName: 'User',
-      role: UserRole.ADMIN,
-    },
-    {
-      email: 'john@test.com',
-      password: await bcrypt.hash('password321', 10),
-      firstName: 'John',
-      lastName: 'Doe',
-      role: UserRole.CUSTOMER,
-    },
-    {
-      email: 'jane@test.com',
-      password: await bcrypt.hash('password213', 10),
-      firstName: 'Jane',
-      lastName: 'Doe',
-      role: UserRole.CUSTOMER,
-    },
+      firstName: 'super',
+      lastName: 'Admin',
+      role: UserRole.SUPER_ADMIN,
+      phone: '+2250565676413',
+
+    }
   ];
 
   for (const userData of users) {
-    const existing = await userRepository.findOne({ 
-      where: { email: userData.email } 
+    const existing = await userRepository.findOne({
+      where: { phone: userData.phone }
     });
-    
+
     if (!existing) {
       await userRepository.save(userData);
-      console.log(`✅ User "${userData.email}" created`);
     } else {
-      console.log(`ℹ️  User "${userData.email}" already exists`);
+      console.log(`ℹ️  User "${userData.phone}" already exists`);
     }
   }
 

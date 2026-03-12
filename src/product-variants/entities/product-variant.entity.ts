@@ -1,8 +1,9 @@
 import { Product } from '../../products/entities/product.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, Unique, RelationId } from 'typeorm';
 
 
 @Entity('product_variants')
+@Unique('uq_variant_sku_product', ['sku', 'product'])
 @Index('idx_product_variants_product_id', ['product'])
 export class ProductVariant {
   @PrimaryGeneratedColumn('uuid')
@@ -11,6 +12,9 @@ export class ProductVariant {
   @ManyToOne(() => Product, product => product.variants, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @RelationId((variant: ProductVariant) => variant.product)
+  productId: string;
 
   @Column({ length: 100 })
   name: string;
@@ -47,7 +51,7 @@ export class ProductVariant {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
+  f
   get availabledQuantity(): number {
     // Calcule la quantité disponible
     return this.stockQuantity - this.reservedQuantity;

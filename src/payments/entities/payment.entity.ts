@@ -3,6 +3,7 @@ import { Order } from '../../orders/entities/order.entity';
 import { PaymentMethodType } from '../enums/payment-method-type.enum';
 import { currencyTypes } from '../../common/enums/currency-type.enum';
 import { PaymentStatus } from '../enums/payment-status.enum';
+import { Store } from '../../stores/entities/store.entity';
 
 @Entity('payments')
 @Index('idx_payments_order_id', ['order'])
@@ -15,19 +16,23 @@ export class Payment {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
+  @ManyToOne(() => Store, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
-  @Column({type: 'enum', enum: currencyTypes, default: currencyTypes.EUR })
+  @Column({ type: 'enum', enum: currencyTypes, default: currencyTypes.EUR })
   currency: currencyTypes;
 
-  @Column({name: 'payment_method', type: 'enum', enum: PaymentMethodType, })
+  @Column({ name: 'payment_method', type: 'enum', enum: PaymentMethodType, })
   paymentMethod: PaymentMethodType;
 
-  @Column({name: 'payment_provider', length: 50, nullable: true })
+  @Column({ name: 'payment_provider', length: 50, nullable: true })
   paymentProvider?: string;
 
-  @Column({name: 'transaction_id', length: 255, nullable: true })
+  @Column({ name: 'transaction_id', length: 255, nullable: true })
   transactionId?: string;
 
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })

@@ -1,16 +1,13 @@
 import { CreateOrderDto } from './dto/create-order.dto';
-import {Injectable, NotFoundException, BadRequestException, ForbiddenException} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, Or, LessThan, Between } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { Cart } from '../carts/entities/cart.entity';
-import { CartItem } from '../cart-items/entities/cart-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { Address } from '../addresses/entities/address.entity';
-import { Coupon } from '../coupons/entities/coupon.entity';
 import { Notification } from '../notifications/entities/notification.entity';
 import { OrderItem } from '../order-items/entities/order-item.entity';
-import { CouponUsage } from '../coupon-usage/entities/coupon-usage.entity';
 import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { OrderDto } from './dto/response/order-dto';
 import { mapToOrderDto } from './mapper/map-to-order.dto';
@@ -19,77 +16,135 @@ import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { OrderStatus } from './enums/order-status.enum';
 import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
-import { Cron } from '@nestjs/schedule';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
+import { Store } from 'src/stores/entities/store.entity';
+import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from 'src/common/helpers/buildWhatssapLink';
+import { User } from 'src/users/entities/user.entity';
+import { UserRole } from 'src/users/enum/userRole.enum';
+import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
+import { CartItem } from 'src/cart-items/entities/cart-item.entity';
+import { Coupon } from 'src/coupons/entities/coupon.entity';
+import { CouponUsage } from 'src/coupon-usage/entities/coupon-usage.entity';
+import { CreateOrderItemDto } from 'src/order-items/dto/create-order-item.dto';
+import { ResolvedOrderItem } from './type/ResolvedOrderItem';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
-    @InjectRepository(Notification)
-    private readonly notificationsRepository: Repository<Notification>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * CRÉER une commande (Checkout)
    * @param userId l'ID de l'utilisateur
+   * @param storeSlug le slug de la boutique
    * @param createOrderDto 
    * @return Promise<OrderDto>
    */
-  async createOrder(userId: string, createOrderDto: CreateOrderDto): Promise<ResponseDto<OrderDto>> {
+  async createOrder(sessionId: string, createOrderDto: CreateOrderDto, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const cart = await manager.findOne(Cart, {
-        where: { user: { id: userId } },
-        relations: ['items', 'items.product', 'items.variant'],
-      });
-      if (!cart || cart.items.length === 0) {
-        throw new BadRequestException('Cart is empty');
-      } 
-      // vérifier les stocks de tous les items du panier
-      for (const cartItem of cart.items) {
-        let availableStock: number;
-        let productName: string;
-        if (cartItem.variant) {
-          const variant = await manager.findOne(ProductVariant, {
-            where: { id: cartItem.variant.id },
-          });
-          if (!variant) {
-            throw new NotFoundException(`Variant not found`);
-          }
-          availableStock = variant.availabledQuantity;
-          console.log(availableStock, 'availableStock');
-          console.log(variant.reservedQuantity, 'reservedQuantity');
-          productName = `${cartItem.product.name} - ${variant.name}`;
-        } else {
-          availableStock = cartItem.product.availabledQuantity;
-          productName = cartItem.product.name;
-        }
-        console.log(cartItem.quantity, 'cart Item quantity');
-        if (availableStock < cartItem.quantity) {
-          throw new BadRequestException(
-            `Not enough stock for ${productName}. Available: ${availableStock}, Requested: ${cartItem.quantity}`,
-          );
-        }
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
       }
+
+      let user = await manager.findOneBy(User, { phone: createOrderDto.address?.phone });
+      if (!user) {
+        user = await manager.save(User, {
+          phone: createOrderDto.address?.phone,
+          firstName: createOrderDto.address?.name,
+          role: UserRole.CUSTOMER,
+        });
+      }
+
+      const adress = await manager.findOne(Address, {
+        where: {
+          userId: user.id,
+          city: createOrderDto.address?.city,
+          neighborhood: createOrderDto.address?.neighborhood,
+        },
+      });
+      if (!adress) {
+        await manager.save(Address, {
+          userId: user.id,
+          store: store,
+          city: createOrderDto.address?.city,
+          neighborhood: createOrderDto.address?.neighborhood,
+          user: user,
+        });
+      }
+
+      await manager.upsert(ShopCustomer, { user, store }, { conflictPaths: ['user', 'storeId'] });
+
+      const userId = user.id;
+
+      // ✅ Résolution des items : panier OU commande directe
+      let orderItems: ResolvedOrderItem[];
+      let subtotal: number;
+      let tax: number;
+      let shippingCost: number;
+      let discountAmount: number;
+      let total: number;
+      let couponCode: string | null;
+      let cartToDelete: Cart | null = null;
+
+      const hasDirectItems = createOrderDto.items && createOrderDto.items.length > 0;
+
+      if (hasDirectItems) {
+        // ─── CAS COMMANDE DIRECTE (sans panier) ───
+        orderItems = await this.resolveDirectItems(createOrderDto.items, manager);
+        subtotal = orderItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+        tax = 0;
+        shippingCost = createOrderDto.shippingCost ?? 0;
+        discountAmount = 0;
+        couponCode = null;
+        total = subtotal + tax + shippingCost - discountAmount;
+      } else {
+        // ─── CAS PANIER ───
+        const cart = await manager.findOne(Cart, {
+          where: { sessionId, store: { slug: storeSlug } },
+          relations: ['items', 'items.product', 'items.variant'],
+        });
+        if (!cart || cart.items.length === 0) {
+          throw new BadRequestException('Le panier est vide');
+        }
+        orderItems = cart.items.map((cartItem) => ({
+          product: cartItem.product,
+          variant: cartItem.variant ?? null,
+          quantity: cartItem.quantity,
+          unitPrice: cartItem.price,
+        }));
+        subtotal = cart.subtotal;
+        tax = cart.tax;
+        shippingCost = cart.shippingCost;
+        discountAmount = cart.discountAmount;
+        total = cart.total;
+        couponCode = cart.couponCode;
+        cartToDelete = cart;
+      }
+
+      // Vérification des stocks (commun aux deux cas)
+      await this.checkStocks(orderItems, manager);
+
       const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 60); // 60 minutes à partir de maintenant
-      // générer un numéro de commande unique
+      expiresAt.setMinutes(expiresAt.getMinutes() + 60);
+
       const orderNumber = await this.generateOrderNumber(manager);
-      // Préparer les snapshots d'adresse
       const { shippingSnapshot, billingSnapshot, address } = await this.checkAdress(createOrderDto, userId, manager);
+
       const order = await manager.save(Order, {
         orderNumber,
-        user: { id: userId },
-        status: OrderStatus.PENDING_PAYMENT,
+        store,
+        user,
         paymentStatus: PaymentStatus.PENDING_PAYMENT,
-        subtotal: cart.subtotal,
-        tax: cart.tax,
-        shippingCost: cart.shippingCost,
-        discountAmount: cart.discountAmount,
-        total: cart.total,
-        couponCode: cart.couponCode,
+        subtotal,
+        tax,
+        shippingCost,
+        discountAmount,
+        total,
+        couponCode,
         shippingAddress: address,
         billingAddress: address,
         shippingAddressSnapshot: shippingSnapshot,
@@ -98,44 +153,201 @@ export class OrdersService {
         paymentMethod: createOrderDto.paymentMethod,
         expiresAt,
       });
-      // creer les orders items (Snapshot des produits)
-      for (const cartItem of cart.items) {
-        const product = cartItem.product;
-        const variant = cartItem.variant;
+
+      // ✅ Création des OrderItems (commun aux deux cas)
+      for (const item of orderItems) {
         await manager.save(OrderItem, {
           order: { id: order.id },
-          product: { id: product?.id },
-          variant: { id: variant?.id },
-          productName: product.name,
-          productSku: product.sku, 
-          variantName: variant?.name,
-          quantity: cartItem.quantity,
-          unitPrice: cartItem.price, 
-          totalPrice: cartItem.price * cartItem.quantity,
+          product: { id: item.product.id },
+          productVariant: item.variant ? { id: item.variant.id } : null,
+          productName: item.product.name,
+          productSku: item.product.sku,
+          productSlug: item.product.slug,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.unitPrice * item.quantity,
         });
       }
-      // décrémenter les stocks
-      for (const cartItem of cart.items) {
-        if (cartItem.variant?.id) {
-          await manager.increment(ProductVariant, { id: cartItem.variant.id },'reservedQuantity', cartItem.quantity);
+
+      // Décrémentation des stocks (commun aux deux cas)
+      for (const item of orderItems) {
+        if (item.variant?.id) {
+          await manager.increment(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
         } else {
-          // Stock géré par produit
-          await manager.increment(Product,{ id: cartItem.product.id },'availabledQuantity', cartItem.quantity);
+          await manager.increment(Product, { id: item.product.id }, 'reservedQuantity', item.quantity);
         }
       }
-      
-      // retourner la commande complète avec les items
+
+      //Suppression du panier uniquement si on est passé par le panier
+      if (cartToDelete) {
+        await manager.delete(CartItem, { cart: { id: cartToDelete.id } });
+        await manager.delete(Cart, { id: cartToDelete.id });
+      }
+
       const fullOrder = await manager.findOne(Order, {
         where: { id: order.id },
         relations: ['items', 'items.product'],
       });
       if (!fullOrder) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Commande introuvable');
       }
+
+      const whatsappUrl = getWhatsAppRedirectUrl(fullOrder, store);
+
       return {
         success: true,
-        message: 'Order created successfully',
+        message: 'Commande crée avec success',
         data: mapToOrderDto(fullOrder),
+        whatssappRedirectUrl: whatsappUrl,
+      };
+    });
+  }
+
+  //Résolution des items directs (récupère Product/Variant depuis la DB)
+  private async resolveDirectItems(items: CreateOrderItemDto[], manager: EntityManager): Promise<ResolvedOrderItem[]> {
+    const resolved: ResolvedOrderItem[] = [];
+    for (const item of items) {
+      const product = await manager.findOne(Product, { where: { id: item.productId } });
+      if (!product) {
+        throw new NotFoundException(`Produit introuvable: ${item.productId}`);
+      }
+      let variant: ProductVariant | null = null;
+      if (item.variantId) {
+        variant = await manager.findOne(ProductVariant, { where: { id: item.variantId } });
+        if (!variant) {
+          throw new NotFoundException(`Variant introuvable: ${item.variantId}`);
+        }
+      }
+      const unitPrice = variant?.price ?? product.price;
+      resolved.push({ product, variant, quantity: item.quantity, unitPrice: unitPrice ?? 0 });
+    }
+    return resolved;
+  }
+
+  //Vérification des stocks extraite en méthode commune
+  private async checkStocks(items: ResolvedOrderItem[], manager: EntityManager): Promise<void> {
+    for (const item of items) {
+      let availableStock: number;
+      let label: string;
+      if (item.variant) {
+        const variant = await manager.findOne(ProductVariant, { where: { id: item.variant.id } });
+        if (!variant) throw new NotFoundException(`Variant introuvable`);
+        availableStock = variant.availabledQuantity;
+        label = `${item.product.name} - ${variant.name}`;
+      } else {
+        availableStock = item.product.availabledQuantity;
+        label = item.product.name;
+      }
+      if (availableStock < item.quantity) {
+        throw new BadRequestException(
+          `Pas suffisant de stock pour ${label}. Disponible: ${availableStock}, Demandé: ${item.quantity}`,
+        );
+      }
+    }
+  }
+
+
+  /**
+ * Modifier le statut d'une commande (Admin)
+ * @param orderId l'ID de la commande
+ * @param storeSlug le slug de la boutique
+ * @param newStatus le nouveau statut
+ * @return Promise<OrderDto>
+ */
+  async updateOrderStatusBySeller(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items', 'store'] });
+      if (!order) {
+        throw new NotFoundException('Commande introuvable');
+      }
+      // Valider la transition de statut
+      this.validateStatusTransition(order.status, newStatus);
+      // Mettre à jour le statut
+      order.status = newStatus;
+      // Mettre à jour les dates selon le statut
+      if (newStatus === OrderStatus.CONFIRMED_BY_CLIENT) {
+        order.confirmedAt = new Date();
+      } else if (newStatus === OrderStatus.DELIVERED) {
+        order.deliveredAt = new Date();
+      } else if (newStatus === OrderStatus.CANCELLED) {
+        order.cancelledAt = new Date();
+        // Restaurer le stock
+        await this.restoreStock(order.items, manager);
+      } else if (newStatus === OrderStatus.APPROVED_BY_SELLER) {
+        order.approvedAt = new Date();
+      }
+
+      await manager.save(Order, order);
+      // Notification
+      await manager.save(Notification, {
+        userId: order.user?.id,
+        store: order.store,
+        type: 'commande_status',
+        title: `commande ${this.formatStatus(newStatus)}`,
+        message: `Votre commande ${order.orderNumber} a maintenant le statut ${newStatus}`,
+        metadata: { orderId: order.id },
+      });
+
+      return {
+        success: true,
+        message: 'Commande mise à jour avec success',
+        data: mapToOrderDto(order),
+      };
+    });
+  }
+
+  /**
+* Modifier le statut d'une commande (Admin)
+* @param orderId l'ID de la commande
+* @param storeSlug le slug de la boutique
+* @param newStatus le nouveau statut
+* @return Promise<OrderDto>
+*/
+  async updateOrderStatusByCustomer(orderId: string, newStatus: OrderStatus, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, { where: { slug: storeSlug } });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug } }, relations: ['items', 'user'] });
+      if (!order) {
+        throw new NotFoundException('Commande introuvable');
+      }
+
+      if (
+        newStatus !== OrderStatus.CONFIRMED_BY_CLIENT &&
+        newStatus !== OrderStatus.CANCELLED
+      ) {
+        throw new BadRequestException('Statut non autorisé');
+      }
+      // Valider la transition de statut
+      this.validateStatusTransition(order.status, newStatus);
+      // Mettre à jour le statut
+      order.status = newStatus;
+      // Mettre à jour les dates selon le statut
+      if (newStatus === OrderStatus.CONFIRMED_BY_CLIENT) {
+        order.confirmedAt = new Date();
+      } else if (newStatus === OrderStatus.CANCELLED) {
+        order.cancelledAt = new Date();
+        // Restaurer le stock
+        const orderItems = await manager.find(OrderItem, { where: { order: { id: order.id } }, relations: ['product'] },);
+        await this.restoreStock(orderItems, manager);
+      }
+      await manager.save(Order, order);
+      // Notification
+      await manager.save(Notification, {
+        userId: order.user?.id,
+        store: store,
+        type: 'Commande Status',
+        title: `Commande ${this.formatStatus(newStatus)}`,
+        message: `Votre commande ${order.orderNumber} a maintenant le statut ${newStatus}`,
+        metadata: { orderId: order.id },
+      });
+
+      return {
+        success: true,
+        message: 'Commande mise à jour avec success',
+        data: mapToOrderDto(order),
       };
     });
   }
@@ -143,15 +355,16 @@ export class OrdersService {
   /**
    * récupérer les commandes d'un utilisateur
    * @param userId id de l'utilisateur
+   * @param storeSlug le slug de la boutique
    * @param paginationDto options de pagination
    * 
    */
-  async getUserOrders(userId: string,paginationDto: PaginationDto,): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+  async getUserOrders(userId: string, paginationDto: PaginationDto, storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
     const page = paginationDto.page || 1;
     const limit = paginationDto.limit || 10;
     const skip = (page - 1) * limit;
     const [orders, total] = await this.ordersRepository.findAndCount({
-      where: { user: { id: userId } },
+      where: { user: { id: userId }, store: { slug: storeSlug } },
       relations: ['items'],
       order: { createdAt: 'DESC' },
       skip,
@@ -168,27 +381,29 @@ export class OrdersService {
           total,
           totalPages: Math.ceil(total / limit),
         },
-    }
+      }
     };
   }
 
   /**
    * récupérer une commande par ID pour un utilisateur
    * @param userId l'ID de l'utilisateur
+   * @param storeSlug le slug de la boutique
    * @param orderId l'ID de la commande
    * @return Promise<OrderDto>
    */
-  async getOrderById(userId: string, orderId: string): Promise<ResponseDto<OrderDto>> {
-    const order = await this.ordersRepository.findOne({where: { id: orderId }, relations: ['user', 'items', 'items.product']});
+  async getOrderById(userId: string, orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    const order = await this.ordersRepository.findOne(
+      {
+        where: { id: orderId, store: { slug: storeSlug } },
+        relations: ['user', 'items', 'items.product']
+      });
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException('Commande introuvable');
     }
-    if (order.user?.id !== userId) {
-        throw new ForbiddenException('You can only retrieve your own orders');
-      }
     return {
       success: true,
-      message: 'Order retrieved successfully',
+      message: 'Commande obtenue avec success',
       data: mapToOrderDto(order),
     };
   }
@@ -196,108 +411,57 @@ export class OrdersService {
   /**
    * Annuler une commande par l'utilisateur
    * @param userId l'ID de l'utilisateur
+   * @param storeSlug le slug de la boutique
    * @param orderId l'ID de la commande
    * @return Promise<OrderDto>
    */
-  async cancelOrder(userId: string, orderId: string): Promise<ResponseDto<OrderDto>> {
+  async cancelOrder(userId: string, orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items', 'user']});
+      const order = await manager.findOne(Order, { where: { id: orderId, store: { slug: storeSlug }, user: { id: userId } }, relations: ['items', 'user'] });
       if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Vérifier ownership
-      if (order.user?.id !== userId) {
-        throw new ForbiddenException('You can only cancel your own orders');
+        throw new NotFoundException('Commande introuvable');
       }
       // Vérifier que la commande peut être annulée
-      if (![OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED].includes(order.status)) {
+      if (![OrderStatus.PENDING_CONFIRMATION].includes(order.status)) {
         throw new BadRequestException(
-          `Cannot cancel order with status: ${order.status}`,
+          `La commande ne peut pas etre annulée. Statut: ${order.status}`,
         );
       }
       // Mettre le statut à cancelled
       order.status = OrderStatus.CANCELLED;
       order.cancelledAt = new Date();
       await manager.save(Order, order);
-      // Restaurer le stock
-      await this.restoreStock(order.items, manager);
       // Notification
       await manager.save(Notification, {
         userId,
-        type: 'order_status',
-        title: 'Order Cancelled',
-        message: `Your order ${order.orderNumber} has been cancelled`,
+        type: 'Commande Status',
+        title: 'Commande Annulée',
+        message: `Votre commande ${order.orderNumber} a bien été annulée`,
         metadata: { orderId: order.id },
       });
 
       return {
         success: true,
-        message: 'Order cancelled successfully',
+        message: 'Commande annulée avec success',
         data: mapToOrderDto(order),
       };
     });
   }
 
-  /**
-   *  Modifier le statut d'une commande (Admin)
-   * @param orderId l'ID de la commande
-   * @param newStatus le nouveau statut
-   * @return Promise<OrderDto>
-   */
-  async updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<ResponseDto<OrderDto>> {
-    return this.dataSource.transaction(async (manager) => {
-       console.log("++++++++++++++++++++++++++++++++++++++++++++++--")
-    console.log("00000000000000000000000000000000000000000000")
-    console.log(orderId, 'ppppppppppppppppppppppppppppppppppppppppppppp', newStatus)
-      const order = await manager.findOne(Order, {where: { id: orderId }, relations: ['items']});
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      // Valider la transition de statut
-      console.log("iciiiiiiiiiii")
-      this.validateStatusTransition(order.status, newStatus);
-            console.log("iciiiiiiiiiii")
-
-      // Mettre à jour le statut
-      order.status = newStatus;
-      // Mettre à jour les dates selon le statut
-      if (newStatus === OrderStatus.SHIPPED) {
-        order.shippedAt = new Date();
-      } else if (newStatus === OrderStatus.DELIVERED) {
-        order.deliveredAt = new Date();
-      } else if (newStatus === OrderStatus.CANCELLED) {
-        order.cancelledAt = new Date();
-        // Restaurer le stock
-        await this.restoreStock(order.items, manager);
-      }
-
-      await manager.save(Order, order);
-      // Notification
-      await manager.save(Notification, {
-        userId: order.user?.id,
-        type: 'order_status',
-        title: `Order ${this.formatStatus(newStatus)}`,
-        message: `Your order ${order.orderNumber} is now ${newStatus}`,
-        metadata: { orderId: order.id },
-      });
-
-      return {
-        success: true,
-        message: 'Order status updated successfully',
-        data: mapToOrderDto(order),
-      };
-    });
-  }
 
   /**
    * recupérer toutes les commandes (Admin)
    * @param orderFilterParams options de filtre
+   * @param storeSlug le slug de la boutique
    * @return Promise<ResponseDto<PaginatedResponseDto<OrderDto>>>
    */
-  async getAllOrders(orderFilterParams: OrderFilterParams): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
-    const {page=1, limit=100, status, date } = orderFilterParams;
+  async getAllOrders(orderFilterParams: OrderFilterParams, storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
+    const { page = 1, limit = 100, status, date } = orderFilterParams;
     const skip = (page - 1) * limit;
-    const whereCondition :any = {};
+    const whereCondition: any = {};
+    if (storeSlug) {
+      whereCondition.store = { slug: storeSlug };
+    }
     if (status) {
       whereCondition.status = status;
     }
@@ -308,6 +472,7 @@ export class OrdersService {
       end.setHours(23, 59, 59, 999)
       whereCondition.createdAt = Between(start, end);
     }
+
     const [orders, total] = await this.ordersRepository.findAndCount({
       where: whereCondition,
       relations: ['items', 'shippingAddress', 'billingAddress', 'user'],
@@ -317,7 +482,7 @@ export class OrdersService {
     });
     return {
       success: true,
-      message: 'All orders retrieved successfully',
+      message: 'Toutes les commandes recupérées avec success',
       data: {
         items: orders.map(mapToOrderDto),
         pagination: {
@@ -331,6 +496,53 @@ export class OrdersService {
   }
 
   /**
+   * Confirmer une commande par le client
+   * @param orderId l'ID de la commande
+   * @param storeSlug le slug de la boutique
+   * @param idUser l'ID de l'utilisateur
+   * @return Promise<OrderDto> la commande mise à jour
+   */
+
+  /**
+   * Annuler une commande par vendeur
+   * @param orderId l'ID de la commande
+   * @param idUser l'ID de l'utilisateur
+   * @param storeSlug le slug de la boutique
+   * @return Promise<OrderDto>
+   */
+  async cancelOrderBySeller(orderId: string, storeSlug: string): Promise<OrderDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId, store: { slug: storeSlug } },
+        relations: ['items', 'items.variant', 'items.product', 'user'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      // Mettre à jour l'order
+      order.status = OrderStatus.CANCELLED;
+      order.cancelledAt = new Date();
+      order.expiresAt = null;
+      await manager.save(Order, order);
+      // Liberer le stock reservedQuantity
+      await this.releaseStock(order.id);
+      // notification
+      try {
+        await manager.save(Notification, {
+          userId: order.user.id,
+          type: 'order_status',
+          title: 'Payment Failed',
+          message: `Your payment for order ${order.orderNumber} has been cancelled!`,
+          metadata: { orderId: order.id },
+        });
+      } catch (err) {
+        console.error('Notification failed', err);
+      }
+      return mapToOrderDto(order);
+    });
+  }
+
+  /**
    * Générer un numéro de commande unique
    * @param manager entité manager
    * @return le numéro de commande
@@ -338,8 +550,7 @@ export class OrdersService {
    */
   private async generateOrderNumber(manager: any): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await manager.count(Order);
-    const orderNum = String(count + 1).padStart(5, '0');
+    const orderNum = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
     return `ORD-${year}-${orderNum}`;
   }
 
@@ -350,19 +561,16 @@ export class OrdersService {
    */
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending_payment: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-      confirmed: [OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.PROCESSING],
-      processing: [OrderStatus.SHIPPED, OrderStatus.DELIVERED],
-      shipped: [OrderStatus.DELIVERED],
+      pending_confirmation: [OrderStatus.CONFIRMED_BY_CLIENT, OrderStatus.CANCELLED],
+      confirmed_by_client: [OrderStatus.APPROVED_BY_SELLER, OrderStatus.CANCELLED],
+      approved_by_seller: [OrderStatus.DELIVERED],
       delivered: [],
       cancelled: [],
-      expired: [],
-      payment_failed: []
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
       throw new BadRequestException(
-        `Invalid status transition: ${currentStatus} -> ${newStatus}`,
+        `Impossible de passer de: ${currentStatus} -> ${newStatus}`,
       );
     }
   }
@@ -373,15 +581,14 @@ export class OrdersService {
    */
   private formatStatus(status: string): string {
     const statusMap: { [key: string]: string } = {
-      pending_payment: OrderStatus.PENDING_PAYMENT,
-      confirmed: OrderStatus.CONFIRMED,
-      processing: OrderStatus.PROCESSING,
-      shipped: OrderStatus.SHIPPED,
+      pending_confirmation: OrderStatus.PENDING_CONFIRMATION,
+      confirmed_by_client: OrderStatus.CONFIRMED_BY_CLIENT,
+      approved_by_seller: OrderStatus.APPROVED_BY_SELLER,
       delivered: OrderStatus.DELIVERED,
       cancelled: OrderStatus.CANCELLED,
     };
     return statusMap[status] || status;
-  }  
+  }
 
   /**
    * 
@@ -393,253 +600,70 @@ export class OrdersService {
   private async checkAdress(
     createOrderDto: CreateOrderDto,
     userId: string,
-    manager: EntityManager): Promise<{shippingSnapshot: any, billingSnapshot: any, address: Address}> {
-  let address = await manager.findOne(Address, {
-        where: { 
-          streetAddress: createOrderDto.address.streetAddress, 
-          userId: userId, 
-          city: createOrderDto.address.city,
-          apartment: createOrderDto.address.apartment,
-          postalCode: createOrderDto.address.postalCode,
-          country: createOrderDto.address.country,
-          state: createOrderDto.address.state,
-          user: { id: userId } },
+    manager: EntityManager): Promise<{ shippingSnapshot: any, billingSnapshot: any, address: Address }> {
+    let address = await manager.findOne(Address, {
+      where: {
+        userId: userId,
+        city: createOrderDto.address?.city,
+        neighborhood: createOrderDto.address?.neighborhood,
+        user: { id: userId }
+      },
+    });
+
+    if (!address) {
+      address = await manager.save(Address, {
+        userId: userId,
+        city: createOrderDto.address?.city,
+        neighborhood: createOrderDto.address?.neighborhood,
+        user: { id: userId }
       });
+    }
 
-      if (!address) {
-        address = await manager.save(Address, {
-          userId: userId,
-          addressType: createOrderDto.address.addressType,
-          streetAddress: createOrderDto.address.streetAddress,
-          apartment: createOrderDto.address.apartment,
-          city: createOrderDto.address.city,
-          state: createOrderDto.address.state,
-          postalCode: createOrderDto.address.postalCode,
-          country: createOrderDto.address.country,        
-        });
-      }
+    const snapshot = {
+      city: address.city,
+      neighborhood: address.neighborhood
+    };
 
-      const snapshot = {
-        streetAddress: address.streetAddress,
-        apartment: address.apartment,
-        city: address.city,
-        state: address.state,
-        postalCode: address.postalCode,
-        country: address.country,
-      };
-      
-      return {
-        shippingSnapshot: snapshot,
-        billingSnapshot: snapshot,
-        address: address,
-      };
+    return {
+      shippingSnapshot: snapshot,
+      billingSnapshot: snapshot,
+      address: address,
+    };
   }
 
-    /**
-   * restaurer le stock des produits d'une commande en cas de commande annulée
-   * @param orderItems les items de la commande
-   * @param manager entité manager
-   * @return
-   */
+  /**
+ * restaurer le stock des produits d'une commande en cas de commande annulée
+ * @param orderItems les items de la commande
+ * @param manager entité manager
+ * @return
+ */
   private async restoreStock(orderItems: OrderItem[], manager: any): Promise<void> {
     for (const item of orderItems) {
-      if (item.variant?.id) {await manager.increment( ProductVariant,{ id: item.variant.id },'stockQuantity', item.quantity);
+      if (item.variant?.id) {
+        await manager.increment(ProductVariant, { id: item.variant.id }, 'stockQuantity', item.quantity);
       } else {
-        await manager.increment(Product,{ id: item.product.id }, 'stockQuantity',item.quantity);
+        await manager.increment(Product, { id: item.product.id }, 'stockQuantity', item.quantity);
       }
     }
   }
 
   /**
- * Confirmer le paiement (appelé par webhook)
- * @param orderId l'ID de la commande
- * @returns Promise<OrderDto>
- */
-async confirmPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-  return this.dataSource.transaction(async (manager) => {
-    const order = await manager.findOne(Order, {
-      where: { id: orderId },
-      relations: ['items', 'items.variant', 'items.product', 'user'],
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    // Convertir réservation en vente
-    for (const item of order.items) {
-      if (item.variant) {
-        // Décrémenter stock ET réservation
-        if (item.variant.stockQuantity < item.quantity) {
-          throw new BadRequestException('Not enough stock for some items');
-        }
-        await manager.decrement(ProductVariant,{ id: item.variant.id},'stockQuantity',item.quantity,);
-        await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
-      } else {
-        if (item.product.stockQuantity < item.quantity) {
-          throw new BadRequestException('Not enough stock for some items');
-        }
-        await manager.decrement(Product,{ id: item.product.id },'stockQuantity',item.quantity);
-        await manager.decrement(Product,{ id: item.product.id },'reservedQuantity',item.quantity,);
+   * Libérer le stock (échec paiement ou expiration)
+   * @param orderId l'ID de la commande
+   */
+  async releaseStock(orderId: string): Promise<void> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, { where: { id: orderId }, relations: ['items', 'items.variant', 'items.product'] });
+      if (!order) {
+        throw new NotFoundException('Commande introuvable');
       }
-    }
-    // Mettre à jour l'order
-    order.status = OrderStatus.CONFIRMED;
-    order.paymentStatus = PaymentStatus.PAID;
-    order.paidAt = new Date();
-    order.expiresAt = null;
-    await manager.save(Order, order);
-    //  on vide le panier
-    console.log('order.user.id$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$',order.user.id);
-    const cart = await manager.findOne(Cart, {where: { user: { id: order.user.id }}});
-    console.log('cart$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$',cart);
-    if (cart) {
-      // gérer les coupon si appliqué
-      if (cart.couponCode) {
-        const coupon = await manager.findOne(Coupon, {where: { code: cart.couponCode }});
-        if (coupon) {
-          // Incrémenter usage_count
-          await manager.increment(Coupon, { id: coupon.id }, 'usageCount', 1);
-          // Créer coupon_usage
-          await manager.save(CouponUsage, {couponId: coupon.id, user: { id: order.user.id }, orderId: order.id, discountAmount: cart.discountAmount});
+      for (const item of order.items) {
+        if (item.variant) {
+          await manager.decrement(ProductVariant, { id: item.variant.id }, 'reservedQuantity', item.quantity);
+        } else {
+          await manager.decrement(Product, { id: item.product.id }, 'reservedQuantity', item.quantity);
         }
       }
-      await manager.delete(CartItem, { cart: { id: cart.id }});
-      await manager.update(Cart,{ id: cart.id },
-        {
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          couponCode: null,
-        },
-      );
-    }
-
-    // notification
-    await manager.save(Notification, {
-      userId: order.user.id,
-      type: 'order_status',
-      title: 'Payment Confirmed',
-      message: `Your payment for order ${order.orderNumber} has been confirmed!`,
-      metadata: { orderId: order.id },
     });
-    return mapToOrderDto(order);
-  });
-}
-
- /**
- * Confirmer le paiement (appelé par webhook)
- * @param orderId l'ID de la commande
- * @returns Promise<OrderDto>
- */
-async FailedPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-  return this.dataSource.transaction(async (manager) => {
-    const order = await manager.findOne(Order, {
-      where: { id: orderId,  user: { id: idUser } },
-      relations: ['items', 'items.variant', 'items.product', 'user'],
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    // Mettre à jour l'order
-    order.status = OrderStatus.PAYMENT_FAILED;
-    order.paymentStatus = PaymentStatus.FAILED;
-    order.cancelledAt = new Date();
-    order.expiresAt = null;
-    await manager.save(Order, order);
-        // Liberer le stock reservedQuantity
-    await this.releaseStock(order.id);
-    // notification
-    try {
-      await manager.save(Notification, {
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Payment Failed',
-        message: `Your payment for order ${order.orderNumber} has failed!`,
-        metadata: { orderId: order.id },
-      });
-    } catch (err) {
-      console.error('Notification failed', err);
-    }
-    return mapToOrderDto(order);
-  });
-}
-
-/**
- * Confirmer le paiement (appelé par webhook)
- * @param orderId l'ID de la commande
- * @returns Promise<OrderDto>
- */
-async cancelPayment(orderId: string, idUser?: string): Promise<OrderDto> {
-  return this.dataSource.transaction(async (manager) => {
-    const order = await manager.findOne(Order, {
-      where: { id: orderId,  user: { id: idUser } },
-      relations: ['items', 'items.variant', 'items.product', 'user'],
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    // Mettre à jour l'order
-    order.status = OrderStatus.CANCELLED;
-    order.paymentStatus = PaymentStatus.CANCELLED;
-    order.cancelledAt = new Date();
-    order.expiresAt = null;
-    await manager.save(Order, order);
-    // Liberer le stock reservedQuantity
-    await this.releaseStock(order.id);
-    // notification
-    try {
-      await manager.save(Notification, {
-        userId: order.user.id,
-        type: 'order_status',
-        title: 'Payment Failed',
-        message: `Your payment for order ${order.orderNumber} has been cancelled!`,
-        metadata: { orderId: order.id },
-      });
-    } catch (err) {
-      console.error('Notification failed', err);
-    }
-    return mapToOrderDto(order);
-  });
-}
-
-/**
- * Libérer le stock (échec paiement ou expiration)
- * @param orderId l'ID de la commande
- */
-async releaseStock(orderId: string): Promise<void> {
-  return this.dataSource.transaction(async (manager) => {
-    const order = await manager.findOne(Order, {where: { id: orderId },relations: ['items', 'items.variant', 'items.product']});
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-    for (const item of order.items) {
-      if (item.variant) {
-        await manager.decrement(ProductVariant,{ id: item.variant.id },'reservedQuantity',item.quantity);
-      } else {
-        await manager.decrement(Product,{ id: item.product.id },'reservedQuantity',item.quantity);
-      }
-    }
-  });
-}
-
-/**
- * Netoyer les reservations expirées (Cron job)
- */
-@Cron('0 * * * *') // Toutes les minutes
-async cleanupExpiredReservations() {
-  const expiredOrders = await this.ordersRepository.find({
-    where: {status: OrderStatus.PENDING_PAYMENT, expiresAt: LessThan(new Date()),},relations: ['user']});
-  for (const order of expiredOrders) {
-    order.status = OrderStatus.EXPIRED;
-    order.paymentStatus = PaymentStatus.EXPIRED;
-    await this.ordersRepository.save(order);
-    await this.releaseStock(order.id);
-    // Notification
-    await this.notificationsRepository.save({
-      userId: order.user.id,
-      type: 'order_status',
-      title: 'Order Expired',
-      message: `Your order ${order.orderNumber} has expired. Please try again.`,
-      metadata: { orderId: order.id },
-    });
-  }}
+  }
 }
