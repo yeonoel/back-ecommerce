@@ -16,26 +16,32 @@ export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private stripe: Stripe;
   constructor(
-        @InjectRepository(Payment)
-        private readonly paymentsRepository: Repository<Payment>,
-        @InjectRepository(Order)
-        private readonly ordersRepository: Repository<Order>,
-        private readonly configService: ConfigService
+    @InjectRepository(Payment)
+    private readonly paymentsRepository: Repository<Payment>,
+    @InjectRepository(Order)
+    private readonly ordersRepository: Repository<Order>,
+    private readonly configService: ConfigService
   ) {
-    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    console.log('ALL ENV VARS:', {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+
+    const secretKey = this.configService.get<string>('stripe.secretKey');
+    console.log('secretKey from configService:', secretKey);
     if (!secretKey) {
       throw new Error('Stripe secret key not found');
     }
     this.stripe = new Stripe(secretKey);
   }
-  
-   /**
-   * créer un Payment Intent Stripe pour une commande
-   * @param orderId l'ID de la commande
-   * @param userId l'ID de l'utilisateur
-   * 
-   */
-  async createPaymentIntent(orderId: string, userId: string): Promise<ResponseDto<PaymentResponseDto>>  {
+
+  /**
+  * créer un Payment Intent Stripe pour une commande
+  * @param orderId l'ID de la commande
+  * @param userId l'ID de l'utilisateur
+  * 
+  */
+  async createPaymentIntent(orderId: string, userId: string): Promise<ResponseDto<PaymentResponseDto>> {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId, user: { id: userId } },
     });
@@ -73,7 +79,8 @@ export class PaymentsService {
       metadata: {
         order_id: order.id,
         order_number: order.orderNumber,
-        user_id: userId,},
+        user_id: userId,
+      },
     });
 
     // Retourner le client_secret pour le frontend
@@ -94,7 +101,7 @@ export class PaymentsService {
    * @return l'événement Stripe validé
    */
   verifyWebhook(rawBody: Buffer, signature: string): Stripe.Event {
-    const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    const webhookSecret = this.configService.get<string>('stripe.webhookSecret');
     if (!webhookSecret) {
       throw new Error('Stripe webhook secret not found');
     }
@@ -115,7 +122,7 @@ export class PaymentsService {
    */
   async handlePaymentSuccess(paymentIntentId: string): Promise<Order | void> {
     // Sera appelé par le webhook controller
-    const payment = await this.paymentsRepository.findOne({where: { transactionId: paymentIntentId },relations: ['order']});
+    const payment = await this.paymentsRepository.findOne({ where: { transactionId: paymentIntentId }, relations: ['order'] });
     if (!payment) {
       this.logger.warn(`Payment not found for intent: ${paymentIntentId}`);
       return;
@@ -131,7 +138,7 @@ export class PaymentsService {
    * @param paymentIntentId l'ID du Payment Intent Stripe
    */
   async handlePaymentFailed(paymentIntentId: string): Promise<Order | void> {
-    const payment = await this.paymentsRepository.findOne({where: { transactionId: paymentIntentId },relations: ['order']});
+    const payment = await this.paymentsRepository.findOne({ where: { transactionId: paymentIntentId }, relations: ['order'] });
     if (!payment) {
       this.logger.warn(`Payment not found for intent: ${paymentIntentId}`);
       return;
