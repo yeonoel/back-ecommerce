@@ -16,8 +16,6 @@ export class InitDatabase1773347674727 implements MigrationInterface {
         await queryRunner.query(`CREATE TYPE "public"."coupons_discount_type_enum" AS ENUM('FIXED_AMOUNT', 'PERCENTAGE')`);
         await queryRunner.query(`CREATE TYPE "public"."coupons_status_enum" AS ENUM('active', 'expired', 'cancelled')`);
 
-
-
         await queryRunner.query(`CREATE TABLE "categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying(100) NOT NULL, "slug" character varying(255) NOT NULL, "description" character varying(255) NOT NULL, "image_url" character varying(500), "parent_id" character varying, "is_active" boolean NOT NULL DEFAULT true, "display_order" integer NOT NULL DEFAULT '0', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8b0be371d28245da6e4f4b61878" UNIQUE ("name"), CONSTRAINT "PK_24dbc6126a28ff948da33e97d3b" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "idx_categories_slug" ON "categories" ("slug") `);
         await queryRunner.query(`CREATE TABLE "product_variants" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying(100) NOT NULL, "sku" character varying(100), "color" character varying(50), "size" character varying(50), "material" character varying(100), "price" numeric(10,2), "stockQuantity" integer NOT NULL DEFAULT '0', "reserved_quantity" integer NOT NULL DEFAULT '0', "is_active" boolean NOT NULL DEFAULT true, "is_deleted" boolean NOT NULL DEFAULT false, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "product_id" uuid, CONSTRAINT "UQ_46f236f21640f9da218a063a866" UNIQUE ("sku"), CONSTRAINT "uq_variant_sku_product" UNIQUE ("sku", "product_id"), CONSTRAINT "PK_281e3f2c55652d6a22c0aa59fd7" PRIMARY KEY ("id"))`);
@@ -214,6 +212,7 @@ export class InitDatabase1773347674727 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."idx_shop_invitations_phone"`);
         await queryRunner.query(`DROP TABLE "shop_invitations"`);
         await queryRunner.query(`DROP TYPE "public"."shop_invitations_status_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."users_role_enum";`);
         await queryRunner.query(`DROP TABLE "users"`);
         await queryRunner.query(`DROP INDEX "public"."idx_addresses_user_id"`);
         await queryRunner.query(`DROP TABLE "addresses"`);
