@@ -7,4 +7,4 @@ import { UploadController } from './upload.controller';
   controllers: [UploadController],
   exports: [UploadService],
 })
-export class UploadModule {}
+export class UploadModule { }

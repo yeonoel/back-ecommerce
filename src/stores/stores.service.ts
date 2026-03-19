@@ -20,7 +20,6 @@ export class StoresService {
   constructor(
     @InjectRepository(Store)
     private readonly storeRepository: Repository<Store>,
-    @InjectRepository(User)
     private readonly uploadService: UploadService,
     private readonly dataSource: DataSource,
   ) { }
@@ -38,7 +37,7 @@ export class StoresService {
   async createStore(dto: CreateStoreDto, logo?: Express.Multer.File): Promise<CreateStoreResponseDto> {
     return await this.dataSource.transaction(async (manager) => {
       const userExists = await manager.findOne(User, { where: { phone: dto.whatsappNumber } });
-      if (userExists) throw new ConflictException('Un utilisateur avec ce numéro existe déjà');
+      if (userExists) throw new ConflictException('Ce numéro de téléphone est déjà utilisé');
 
       const slug = await generateUniqueSlug(dto.name);
       const storeExists = await manager.findOne(Store, { where: { slug } });
@@ -57,7 +56,9 @@ export class StoresService {
       let logoUrl: string | undefined;
       if (logo) {
         try {
+          console.log(logoUrl, "debut");
           logoUrl = await this.uploadService.uploadImage(logo);
+          console.log(logoUrl, "finiiiiiiiiiiiiiiiiiiii");
         } catch (error) {
           throw new BadRequestException(`Échec upload image : ${error.message}`);
         }

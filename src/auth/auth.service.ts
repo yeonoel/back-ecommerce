@@ -89,13 +89,13 @@ export class AuthService {
     const store = await this.storeRepository.findOne({
       where: { owner: { id: user.id } },
     });
-    if (!store && user.role === UserRole.SELLER) {
+    if (!store) {
       throw new NotFoundException('Votre boutique n\'existe pas');
     }
     const payload = await this.buildJwtPayload(user);
 
     const token = this.jwtService.sign(payload);
-    return this.buildAuthResponse(user, token, store?.slug);
+    return this.buildAuthResponse(user, token, store);
   }
 
   private async buildJwtPayload(user: User): Promise<object> {
@@ -132,16 +132,17 @@ export class AuthService {
     }
   }
 
-  private buildAuthResponse(user: User, token: string, slugStore?: string): AuthResponseDto {
+  private buildAuthResponse(user: User, token: string, store?: Store): AuthResponseDto {
     return {
       success: true,
       data: {
         id: user.id,
         role: user.role,
         phone: user.phone,
+        logoStore: store?.logoUrl,
         firstName: user.firstName ?? '',
         lastName: user.lastName ?? '',
-        slugStore: slugStore
+        slugStore: store?.slug
       },
       token: token
     };

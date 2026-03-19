@@ -7,7 +7,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/users/enum/userRole.enum';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { UpdateStoreDto } from './dto/update-store.dto';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Public } from '../common/decorators/public.decorator';
 
 @Controller('stores')
@@ -16,21 +16,13 @@ export class StoresController {
 
   @Post("create")
   @Public()
-  @UseInterceptors(FilesInterceptor('logo'))
+  @UseInterceptors(FileInterceptor('logo'))
   @HttpCode(HttpStatus.CREATED)
-  async createStore(@UploadedFile() logo: Express.Multer.File, @Body() dto: CreateStoreDto) {
-    console.log(dto);
-    console.log("========================");
-    console.log("========================");
-
-    console.log("========================");
-
-    console.log("========================");
-
+  async createStore(@Body() dto: CreateStoreDto, @UploadedFile() logo?: Express.Multer.File) {
     return await this.storesService.createStore(dto, logo);
   }
 
-  @Post("/:id")
+  @Patch("/:id")
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.SELLER, UserRole.SUPER_ADMIN)
   @UseInterceptors(FilesInterceptor('logo'))

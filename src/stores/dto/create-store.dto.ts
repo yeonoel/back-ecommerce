@@ -27,8 +27,4 @@ export class CreateStoreDto {
         message: 'Le numéro doit commencer par +225 suivi de 10 chiffres (ex: +22505XXXXXXXX)'
     })
     whatsappNumber: string;
-
-    @IsUrl()
-    @IsOptional()
-    logo?: string;
 }
