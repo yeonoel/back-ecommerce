@@ -24,8 +24,8 @@ export class StoresController {
 
   @Patch("/:id")
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.SELLER, UserRole.SUPER_ADMIN)
-  @UseInterceptors(FilesInterceptor('logo'))
+  @Roles(UserRole.SELLER)
+  @UseInterceptors(FileInterceptor('logo'))
   @HttpCode(HttpStatus.CREATED)
   async updateStore(@UploadedFile() logo: Express.Multer.File, @Body() dto: UpdateStoreDto, @CurrentUser() user: any, @Param('id') id: string) {
     return await this.storesService.updateStore(id, dto, logo);
