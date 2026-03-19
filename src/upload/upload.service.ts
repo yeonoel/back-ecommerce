@@ -14,10 +14,8 @@ export class UploadService {
    * Upload une image vers Cloudinary avec optimisation
    */
   async uploadImage(file: Express.Multer.File): Promise<string> {
-    console.log("yessssssssssssssssssssssssssssss")
     // Valider le fichier
     this.validateFile(file);
-    console.log("rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr")
     try {
       // Optimiser l'image avec Sharp
       const optimizedBuffer = await this.optimizeImage(file.buffer);
@@ -26,11 +24,9 @@ export class UploadService {
         optimizedBuffer,
         file.originalname,
       );
-      console.log("tresr tttttttttttttttttttttttt")
 
       return result.secure_url;
     } catch (error) {
-      console.error("UPLOAD ERROR:", error); // ✅ ajoute ça
       throw new BadRequestException(`Upload failed: ${error.message}`);
     }
   }

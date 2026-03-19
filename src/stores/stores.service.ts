@@ -56,9 +56,7 @@ export class StoresService {
       let logoUrl: string | undefined;
       if (logo) {
         try {
-          console.log(logoUrl, "debut");
           logoUrl = await this.uploadService.uploadImage(logo);
-          console.log(logoUrl, "finiiiiiiiiiiiiiiiiiiii");
         } catch (error) {
           throw new BadRequestException(`Échec upload image : ${error.message}`);
         }
