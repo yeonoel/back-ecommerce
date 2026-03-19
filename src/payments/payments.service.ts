@@ -22,13 +22,7 @@ export class PaymentsService {
     private readonly ordersRepository: Repository<Order>,
     private readonly configService: ConfigService
   ) {
-    console.log('ALL ENV VARS:', {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-      NODE_ENV: process.env.NODE_ENV,
-    });
-
     const secretKey = this.configService.get<string>('stripe.secretKey');
-    console.log('secretKey from configService:', secretKey);
     if (!secretKey) {
       throw new Error('Stripe secret key not found');
     }

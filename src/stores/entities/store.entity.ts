@@ -10,12 +10,9 @@ export class Store {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @OneToMany(() => ShopInvitation, (invitation) => invitation.store)
-    invitations: ShopInvitation[];
-
-    @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+    @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'owner_id' })
-    owner?: User
+    owner: User
 
     @Column({ length: 255 })
     name: string;
@@ -47,13 +44,6 @@ export class Store {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
-
-    get whatsappLink(): string | null {
-        // Génère le lien wa.me pour contacter la boutique directement
-        if (!this.whatsappNumber) return null;
-        const cleaned = this.whatsappNumber.replace(/\D/g, '');
-        return `https://wa.me/${cleaned}`;
-    }
 
     get isActive(): boolean {
         return this.status === StoreStatus.ACTIVE;

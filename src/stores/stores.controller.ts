@@ -1,32 +1,42 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, Req, Session } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, Req, Session, UseInterceptors, UploadedFiles, UploadedFile } from '@nestjs/common';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { StoresService } from './stores.service';
-import { OnboardingDto } from './dto/onboarding.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/common/guards/roles.gaurds';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/users/enum/userRole.enum';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { UpdateStoreDto } from './dto/update-store.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller('stores')
 export class StoresController {
   constructor(private readonly storesService: StoresService) { }
 
-  @Post()
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Post("create")
+  @Public()
+  @UseInterceptors(FilesInterceptor('logo'))
   @HttpCode(HttpStatus.CREATED)
-  async createStore(@Body() dto: CreateStoreDto, @CurrentUser() user: any) {
-    return await this.storesService.createStoreWithInvitation(dto, user);
+  async createStore(@UploadedFile() logo: Express.Multer.File, @Body() dto: CreateStoreDto) {
+    console.log(dto);
+    console.log("========================");
+    console.log("========================");
+
+    console.log("========================");
+
+    console.log("========================");
+
+    return await this.storesService.createStore(dto, logo);
   }
 
-  @Post("/:slugStore")
+  @Post("/:id")
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SELLER, UserRole.SUPER_ADMIN)
+  @UseInterceptors(FilesInterceptor('logo'))
   @HttpCode(HttpStatus.CREATED)
-  async updateStore(@Body() dto: UpdateStoreDto, @Param('slugStore') slugStore: string) {
-    return await this.storesService.updateStore(slugStore, dto);
+  async updateStore(@UploadedFile() logo: Express.Multer.File, @Body() dto: UpdateStoreDto, @CurrentUser() user: any, @Param('id') id: string) {
+    return await this.storesService.updateStore(id, dto, logo);
   }
 
   @Get()
@@ -43,17 +53,5 @@ export class StoresController {
   @HttpCode(HttpStatus.CREATED)
   async deleteStore(@Param('slugStore') slugStore: string) {
     return await this.storesService.deleteStore(slugStore);
-  }
-
-  /**
-   * Vendeur s'inscrit via son code d'invitation reçu sur WhatsApp.
-   * 
-   * POST /stores/onboarding
-   * Public (pas de guard, le code + tempPassword servent d'auth)
-   */
-  @Post('/invitation/onboarding')
-  @HttpCode(HttpStatus.CREATED)
-  async onboarding(@Body() dto: OnboardingDto) {
-    return await this.storesService.onboardVendor(dto);
   }
 }
