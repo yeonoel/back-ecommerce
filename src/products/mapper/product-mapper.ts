@@ -111,11 +111,6 @@ export class ProductMapper {
       imagesMeta,
     };
 
-    console.log('✅ UpdateProductDto:', {
-      fields: Object.keys(updateDto).filter(key => updateDto[key] !== undefined),
-      imagesToDelete: imagesToDelete?.length || 0
-    });
-
     return updateDto;
   }
 }

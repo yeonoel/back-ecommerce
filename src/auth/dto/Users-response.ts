@@ -4,7 +4,8 @@ export class UserDataDto {
   lastName?: string;
   phone: string;
   role?: string;
-  slugStore?: string
+  slugStore?: string;
+  logoStore?: string;
 }
 
 

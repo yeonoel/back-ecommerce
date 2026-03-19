@@ -16,7 +16,6 @@ export class UploadService {
   async uploadImage(file: Express.Multer.File): Promise<string> {
     // Valider le fichier
     this.validateFile(file);
-
     try {
       // Optimiser l'image avec Sharp
       const optimizedBuffer = await this.optimizeImage(file.buffer);
@@ -25,6 +24,7 @@ export class UploadService {
         optimizedBuffer,
         file.originalname,
       );
+
       return result.secure_url;
     } catch (error) {
       throw new BadRequestException(`Upload failed: ${error.message}`);

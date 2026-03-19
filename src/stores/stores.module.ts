@@ -5,13 +5,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { ShopInvitation } from 'src/shop-invitation/entities/shop-invitation.entity';
 import { Store } from './entities/store.entity';
-import { AuthModule } from '../auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { UploadModule } from 'src/upload/upload.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Store, ShopInvitation, User]),
+    UploadModule,
     JwtModule.registerAsync({        // ← tu as bien ajouté ça ?
       imports: [ConfigModule],
       inject: [ConfigService],

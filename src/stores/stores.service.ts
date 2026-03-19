@@ -1,37 +1,27 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Auth, Repository } from 'typeorm';
-import { nanoid } from 'nanoid';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Store } from './entities/store.entity';
-import { ShopInvitation } from '../shop-invitation/entities/shop-invitation.entity';
 import { StoreStatus } from './enums/store-status.enum';
-import { InvitationStatus } from '../shop-invitation/enums/invitation-status.enum';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enum/userRole.enum';
 import { CreateStoreDto } from './dto/create-store.dto';
-import { OnboardingDto } from './dto/onboarding.dto';
-import { storeResponseDto } from './dto/response/store-reponse.dto';
-import { BuildWhatsappLink } from 'src/common/helpers/buildWhatssapLink';
-import { generateUniqueSlug } from 'src/common/utils/slug.util';
-import { UsersService } from 'src/users/users.service';
-import { AuthService } from 'src/auth/auth.service';
-import { JwtService } from '@nestjs/jwt';
-import { AuthResponseDto } from '../auth/dto/Users-response';
+import { BuildWhatsappLink } from '../common/helpers/buildWhatssapLink';
+import { generateUniqueSlug } from '../common/utils/slug.util';
 import { UpdateStoreDto } from './dto/update-store.dto';
-import { mapToOrderDto } from 'src/orders/mapper/map-to-order.dto';
-import { mapToUserDto } from 'src/auth/mapper/map-To-user-dto';
+import { UploadService } from '../upload/upload.service';
+import { DataSource } from 'typeorm';
+import { CreateStoreResponseDto } from './dto/response/store-reponse.dto';
+import { first } from 'rxjs';
 
 @Injectable()
 export class StoresService {
   constructor(
     @InjectRepository(Store)
     private readonly storeRepository: Repository<Store>,
-    @InjectRepository(ShopInvitation)
-    private readonly invitationRepository: Repository<ShopInvitation>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly jwtService: JwtService,
+    private readonly uploadService: UploadService,
+    private readonly dataSource: DataSource,
   ) { }
 
 
@@ -42,65 +32,83 @@ export class StoresService {
    * L'invitation est créée avec le statut "pending".
    * Le lien WhatsApp est construit avec le mot de passe en CLAIR (avant hashage).
    * @param {CreateStoreDto} dto - Informations de la boutique.
-   * @param {User} superAdmin - L'utilisateur qui crée la boutique.
    * @returns {Promise<storeResponseDto>}
    */
-  async createStoreWithInvitation(dto: CreateStoreDto, superAdmin: User,): Promise<storeResponseDto> {
+  async createStore(dto: CreateStoreDto, logo?: Express.Multer.File): Promise<CreateStoreResponseDto> {
+    return await this.dataSource.transaction(async (manager) => {
+      const userExists = await manager.findOne(User, { where: { phone: dto.whatsappNumber } });
+      if (userExists) throw new ConflictException('Ce numéro de téléphone est déjà utilisé');
 
-    // Générer un slug unique à partir du nom
-    const slug = await generateUniqueSlug(dto.name);
+      const slug = await generateUniqueSlug(dto.name);
+      const storeExists = await manager.findOne(Store, { where: { slug } });
+      if (storeExists) throw new ConflictException('Le nom de cette boutique est déjà pris');
 
-    // Verifier si la boutique existe
-    const storeExists = await this.storeRepository.findOne({ where: { slug } });
-    if (storeExists) throw new ConflictException('Cette Boutique existe deja');
+      const hashedPassword = await bcrypt.hash(dto.password, 10);
+      const newUser = manager.create(User, {
+        phone: dto.whatsappNumber,
+        password: hashedPassword,
+        firstName: dto.vendorName,
+        role: UserRole.SELLER,
+        isActive: true
+      });
+      const savedUser = await manager.save(newUser);
 
-    // Créer la boutique
-    const store = this.storeRepository.create({
-      name: dto.name,
-      slug,
-      description: dto.description,
-      logoUrl: dto.logoUrl,
-      whatsappNumber: dto.phoneNumber,
-      status: StoreStatus.PENDING,
-      createdBy: superAdmin,
+      let logoUrl: string | undefined;
+      if (logo) {
+        try {
+          logoUrl = await this.uploadService.uploadImage(logo);
+        } catch (error) {
+          throw new BadRequestException(`Échec upload image : ${error.message}`);
+        }
+      }
+
+      const store = manager.create(Store, {
+        name: dto.name,
+        slug: slug,
+        description: dto.description,
+        logoUrl: logoUrl,
+        whatsappNumber: dto.whatsappNumber,
+        status: StoreStatus.ACTIVE,
+        owner: savedUser,
+        createdBy: savedUser
+
+      });
+      const savedStore = await manager.save(store);
+
+      // 6. Préparer le lien WhatsApp
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const whatsappLink = BuildWhatsappLink(
+        dto.whatsappNumber,
+        dto.vendorName,
+        savedStore.name,
+        dto.password,
+        expiresAt,
+      );
+
+      return {
+        success: true,
+        message: 'Boutique et compte vendeur créés avec succès.',
+        data: {
+          store: {
+            id: savedStore.id,
+            name: savedStore.name,
+            slug: savedStore.slug,
+            description: savedStore.description,
+            logoUrl: savedStore.logoUrl,
+            whatsappNumber: savedStore.whatsappNumber
+          },
+          user: {
+            id: savedUser.id,
+            firstName: savedUser?.firstName ?? '',
+            phone: savedUser.phone
+          }
+        }
+      };
     });
-    await this.storeRepository.save(store);
-
-    // Générer le code d'invitation et le mot de passe temporaire
-    const inviteCode = nanoid(10).toUpperCase();
-
-    // Expiration dans 7 jours
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    // Créer l'invitation
-    const invitation = this.invitationRepository.create({
-      store,
-      phoneNumber: dto.phoneNumber,
-      vendorName: dto.vendorName,
-      inviteCode,
-      status: InvitationStatus.PENDING,
-      expiresAt,
-    });
-    await this.invitationRepository.save(invitation);
-
-    // Construire le lien WhatsApp avec le mot de passe en CLAIR (avant hashage)
-    const whatsappLink = BuildWhatsappLink(
-      dto.phoneNumber,
-      dto.vendorName ?? '',
-      store.name,
-      inviteCode,
-      expiresAt,
-    );
-
-    return {
-      message: 'Boutique créee avec succes, vous pouvez envoyer le lien WhatsApp au vendeur',
-      storeId: store.id,
-      storeName: store.name,
-      inviteCode: invitation.inviteCode,
-      whatsappLink: whatsappLink,
-    };
   }
+
 
   /**
    * Update a store
@@ -109,25 +117,74 @@ export class StoresService {
    * @returns A response with the updated store
    * @throws NotFoundException If the store is not found
    */
-  async updateStore(slugStore: string, dto: UpdateStoreDto): Promise<storeResponseDto> {
-    const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
-    if (!store) {
-      throw new NotFoundException('Boutique introuvable');
-    }
-    Object.assign(store, {
-      ...(dto.name && { name: dto.name }),
-      ...(dto.description && { description: dto.description }),
-      ...(dto.logoUrl && { logoUrl: dto.logoUrl }),
-      ...(dto.phoneNumber && { whatsappNumber: dto.phoneNumber }),
+  async updateStore(id: string, dto: UpdateStoreDto, logo?: Express.Multer.File): Promise<CreateStoreResponseDto> {
+    return await this.dataSource.transaction(async (manager) => {
+      const store = await manager.findOne(Store, {
+        where: { id },
+        relations: ['owner']
+      });
+      if (!store) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+      if (logo) {
+        try {
+          const newImageUrl = await this.uploadService.uploadImage(logo);
+          // On ne supprime l'ancien que si le nouvel upload a réussi
+          if (store.logoUrl) {
+            await this.uploadService.deleteImage(store.logoUrl);
+          }
+          store.logoUrl = newImageUrl;
+        } catch (error) {
+          throw new BadRequestException(`Échec de l'upload du nouveau logo: ${error.message}`);
+        }
+      }
+      if (dto.name && dto.name !== store.name) {
+        store.slug = await generateUniqueSlug(dto.name);
+        store.name = dto.name;
+      }
+
+
+      if (dto.vendorName) {
+        store.owner.firstName = dto.vendorName;
+      }
+      if (dto.whatsappNumber) {
+        store.owner.phone = dto.whatsappNumber;
+        store.whatsappNumber = dto.whatsappNumber;
+      }
+      // Sauvegarde des modifs du user
+      await manager.save(User, store.owner);
+      if (dto.description) store.description = dto.description;
+      await manager.save(store);
+
+      const updatedStore = await manager.findOne(Store, {
+        where: { id: store.id },
+        relations: ['owner']
+      });
+
+      if (!updatedStore) {
+        throw new NotFoundException('Boutique introuvable');
+      }
+
+      return {
+        success: true,
+        message: 'Boutique mise à jour avec succès.',
+        data: {
+          store: {
+            id: updatedStore.id,
+            name: updatedStore.name,
+            slug: updatedStore.slug,
+            description: updatedStore.description,
+            logoUrl: updatedStore.logoUrl,
+            whatsappNumber: updatedStore.whatsappNumber
+          },
+          user: {
+            id: updatedStore?.owner?.id,
+            firstName: updatedStore.owner?.firstName ?? '',
+            phone: updatedStore.owner.phone
+          }
+        }
+      };
     });
-
-    await this.storeRepository.save(store);
-
-    return {
-      message: 'Boutique mise à jour avec success',
-      storeId: store.id,
-      storeName: store.name,
-    };
   }
 
   async getAllStores(user: any): Promise<Store[]> {
@@ -137,7 +194,7 @@ export class StoresService {
     return this.storeRepository.find({ where: { createdBy: user.id, isDeleted: false } });
   }
 
-  async deleteStore(slugStore: string): Promise<storeResponseDto> {
+  async deleteStore(slugStore: string): Promise<{ message: string }> {
     const store = await this.storeRepository.findOne({ where: { slug: slugStore } });
     if (!store) {
       throw new NotFoundException('Boutique introuvable');
@@ -145,77 +202,7 @@ export class StoresService {
     store.isDeleted = true;
     await this.storeRepository.save(store);
     return {
-      message: 'Boutique supprimée avec success',
-      storeId: store.id,
-      storeName: store.name,
+      message: 'Boutique supprimée avec success'
     };
-  }
-
-
-  /**
-   * Crée un compte vendeur à partir d'un code d'invitation et d'un mot de passe temporaire.
-   * Vérifie que l'invitation est valide et non expirée.
-   * Vérifie que le mot de passe temporaire est correct.
-   * Vérifie que l'email n'est pas déjà enregistré.
-   * Crée le compte vendeur.
-   * Marque l'invitation comme acceptée.
-   * Activer la boutique.
-   * @param {OnboardingDto} dto - Informations pour la création du compte vendeur.
-   * @returns {Promise<AuthResponseDto>} - Le compte vendeur créé et le token JWT.
-   */
-  async onboardVendor(dto: OnboardingDto): Promise<AuthResponseDto> {
-    // Trouver l'invitation
-    const invitation = await this.invitationRepository.findOne({
-      where: { inviteCode: dto.inviteCode, status: InvitationStatus.PENDING },
-      relations: ['store'],
-    });
-    if (!invitation) {
-      throw new NotFoundException('Invitation introuvable ou deja utilisée');
-    }
-    // Vérifier expiration
-    if (invitation.isExpired) {
-      await this.invitationRepository.update(invitation.id, { status: InvitationStatus.EXPIRED });
-      throw new BadRequestException('Cette invitation a expiré');
-    }
-    // Créer le compte vendeur
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-    const vendor = this.userRepository.create({
-      password: hashedPassword,
-      phone: dto.phoneNumber,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      role: UserRole.SELLER,
-      isActive: true,
-      emailVerified: false,
-    });
-    await this.userRepository.save(vendor);
-    // Marquer l'invitation comme acceptée
-    await this.invitationRepository.update(invitation.id, {
-      status: InvitationStatus.ACCEPTED,
-      acceptedBy: vendor,
-      acceptedAt: new Date(),
-    });
-    // Lier le vendeur à la boutique
-    await this.storeRepository.update(invitation.store.id, {
-      owner: vendor,
-    });
-    // Activer la boutique
-    await this.storeRepository.update(invitation.store.id, {
-      status: StoreStatus.ACTIVE,
-    });
-
-    const token = this.jwtService.sign({
-      sub: vendor.id,
-      phone: vendor.phone,
-      role: vendor.role,
-      storeId: invitation.store.id,
-      storeSlug: invitation.store.slug,
-    });
-
-    return {
-      success: true,
-      data: mapToUserDto(vendor),
-      token,
-    }
   }
 }

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUrl, Matches, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUrl, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateStoreDto {
     @IsString()
@@ -7,22 +7,24 @@ export class CreateStoreDto {
     name: string;
 
     @IsString()
+    @IsNotEmpty()
+    @MaxLength(255)
+    vendorName: string;
+
+    @IsString()
+    @IsNotEmpty()
+    @MinLength(8) // Sécurité minimale pour le mot de passe
+    password: string;
+
+    @IsString()
     @IsOptional()
     @MaxLength(1000)
     description?: string;
 
-    @IsUrl()
-    @IsOptional()
-    logoUrl?: string;
-
     @IsString()
     @IsNotEmpty()
-    @Matches(/^\d{10,15}$/, { message: 'phoneNumber must be a valid international number without + (ex: 225XXXXXXXXX)' })
-    phoneNumber: string;
-
-    // Nom du vendeur pour personnaliser le message WhatsApp
-    @IsString()
-    @IsOptional()
-    @MaxLength(255)
-    vendorName?: string;
+    @Matches(/^\+225\d{10}$/, {
+        message: 'Le numéro doit commencer par +225 suivi de 10 chiffres (ex: +22505XXXXXXXX)'
+    })
+    whatsappNumber: string;
 }

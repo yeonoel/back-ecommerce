@@ -11,10 +11,6 @@ export class ShopInvitation {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ManyToOne(() => Store, (store) => store.invitations, { nullable: false, onDelete: 'CASCADE', })
-    @JoinColumn({ name: 'store_id' })
-    store: Store;
-
     @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'accepted_by' })
     acceptedBy?: User;
@@ -49,28 +45,6 @@ export class ShopInvitation {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
-
-    // Génère le lien WhatsApp avec le message pré-rempli
-    get whatsappInviteLink(): string {
-        const cleaned = this.phoneNumber.replace(/\D/g, '');
-        const storeName = this.store?.name ?? 'votre boutique';
-        const vendorName = this.vendorName ? `${this.vendorName}, ` : '';
-
-        const message = [
-            `Bonjour ${vendorName}votre boutique *${storeName}* est prête ! 🎉`,
-            ``,
-            `Voici vos identifiants de connexion :`,
-            `🔑 Code : *${this.inviteCode}*`,
-            `🔒 Mot de passe temporaire : *${this.tempPassword}*`,
-            ``,
-            `Connectez-vous ici pour accéder à votre dashboard :`,
-            `👉 https://votresite.com/onboarding`,
-            ``,
-            `_Ce lien expire le ${this.expiresAt.toLocaleDateString('fr-FR')}._`,
-        ].join('\n');
-
-        return `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`;
-    }
 
     get isExpired(): boolean {
         return new Date() > this.expiresAt;
