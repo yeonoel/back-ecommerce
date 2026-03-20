@@ -25,4 +25,3 @@ export class DashboardController {
     return this.dashboardService.getProductsStats(slugStore, user.id);
   }
 }
-

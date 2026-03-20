@@ -22,10 +22,18 @@ export class StoresController {
     return await this.storesService.createStore(dto, logo);
   }
 
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SELLER)
+  @HttpCode(HttpStatus.OK)
+  async getMyStore(@CurrentUser() user: any) {
+    return await this.storesService.getMyStore(user.id);
+  }
+
   @Patch("/:id")
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.SELLER, UserRole.SUPER_ADMIN)
-  @UseInterceptors(FilesInterceptor('logo'))
+  @Roles(UserRole.SELLER)
+  @UseInterceptors(FileInterceptor('logo'))
   @HttpCode(HttpStatus.CREATED)
   async updateStore(@UploadedFile() logo: Express.Multer.File, @Body() dto: UpdateStoreDto, @CurrentUser() user: any, @Param('id') id: string) {
     return await this.storesService.updateStore(id, dto, logo);
