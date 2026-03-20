@@ -22,6 +22,14 @@ export class StoresController {
     return await this.storesService.createStore(dto, logo);
   }
 
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SELLER)
+  @HttpCode(HttpStatus.OK)
+  async getMyStore(@CurrentUser() user: any) {
+    return await this.storesService.getMyStore(user.id);
+  }
+
   @Patch("/:id")
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.SELLER)

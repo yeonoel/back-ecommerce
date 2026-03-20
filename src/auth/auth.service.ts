@@ -95,7 +95,7 @@ export class AuthService {
     const payload = await this.buildJwtPayload(user);
 
     const token = this.jwtService.sign(payload);
-    return this.buildAuthResponse(user, token, store);
+    return this.buildAuthResponse(user, token, store?.slug, store?.logoUrl);
   }
 
   private async buildJwtPayload(user: User): Promise<object> {
@@ -127,22 +127,22 @@ export class AuthService {
           sub: user.id,
           phone: user.phone,
           role: user.role,
-          slugStore: sellerStore?.slug ?? null, // boutique active au moment du login
+          slugStore: sellerStore?.slug ?? null,
         };
     }
   }
 
-  private buildAuthResponse(user: User, token: string, store?: Store): AuthResponseDto {
+  private buildAuthResponse(user: User, token: string, storeSlug?: string, storeLogoUrl?: string): AuthResponseDto {
     return {
       success: true,
       data: {
         id: user.id,
         role: user.role,
         phone: user.phone,
-        logoStore: store?.logoUrl,
+        logoStore: storeLogoUrl,
         firstName: user.firstName ?? '',
         lastName: user.lastName ?? '',
-        slugStore: store?.slug
+        slugStore: storeSlug
       },
       token: token
     };

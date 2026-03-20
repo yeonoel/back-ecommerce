@@ -12,7 +12,7 @@ import { generateUniqueSlug } from '../common/utils/slug.util';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { UploadService } from '../upload/upload.service';
 import { DataSource } from 'typeorm';
-import { CreateStoreResponseDto } from './dto/response/store-reponse.dto';
+import { CreateStoreResponseDto, StoreResponseDto } from './dto/response/store-reponse.dto';
 import { first } from 'rxjs';
 
 @Injectable()
@@ -79,6 +79,8 @@ export class StoresService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
+      const storeUrl = `${process.env.STOREFRONT_URL}/${savedStore.slug}`;
+
       const whatsappLink = BuildWhatsappLink(
         dto.whatsappNumber,
         dto.vendorName,
@@ -97,7 +99,8 @@ export class StoresService {
             slug: savedStore.slug,
             description: savedStore.description,
             logoUrl: savedStore.logoUrl,
-            whatsappNumber: savedStore.whatsappNumber
+            whatsappNumber: savedStore.whatsappNumber,
+            storeUrl
           },
           user: {
             id: savedUser.id,
@@ -108,7 +111,6 @@ export class StoresService {
       };
     });
   }
-
 
   /**
    * Update a store
@@ -165,6 +167,7 @@ export class StoresService {
         throw new NotFoundException('Boutique introuvable');
       }
 
+      const storeUrl = `${process.env.STOREFRONT_URL}/${updatedStore.slug}`;
       return {
         success: true,
         message: 'Boutique mise à jour avec succès.',
@@ -175,7 +178,8 @@ export class StoresService {
             slug: updatedStore.slug,
             description: updatedStore.description,
             logoUrl: updatedStore.logoUrl,
-            whatsappNumber: updatedStore.whatsappNumber
+            whatsappNumber: updatedStore.whatsappNumber,
+            storeUrl
           },
           user: {
             id: updatedStore?.owner?.id,
@@ -185,6 +189,40 @@ export class StoresService {
         }
       };
     });
+  }
+
+
+  /**
+   * Get the store of a user by its ID
+   * @param userId the ID of the user
+   * @returns the store of the user
+   * @throws {NotFoundException} if the store is not found
+   */
+  async getMyStore(userId: string): Promise<StoreResponseDto> {
+    const store = await this.storeRepository.findOne({
+      where: { owner: { id: userId }, isDeleted: false },
+      relations: ['owner'],
+    });
+    if (!store) throw new NotFoundException('Boutique introuvable');
+
+    return {
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      description: store.description,
+      logoUrl: store.logoUrl,
+      whatsappNumber: store.whatsappNumber,
+      status: store.status,
+      storeUrl: `${process.env.STOREFRONT_URL}/${store.slug}`,
+      createdAt: store.createdAt,
+      updatedAt: store.updatedAt,
+      owner: {
+        id: store.owner.id,
+        firstName: store.owner.firstName,
+        phone: store.owner.phone,
+        role: store.owner.role
+      },
+    };
   }
 
   async getAllStores(user: any): Promise<Store[]> {
