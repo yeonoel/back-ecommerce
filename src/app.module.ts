@@ -32,6 +32,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { StoresModule } from './stores/stores.module';
 import { ShopInvitationModule } from './shop-invitation/shop-invitation.module';
 import { ShopCustomerModule } from './shop-customer/shop-customer.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -69,7 +70,8 @@ import { ShopCustomerModule } from './shop-customer/shop-customer.module';
     DashboardModule,
     StoresModule,
     ShopInvitationModule,
-    ShopCustomerModule
+    ShopCustomerModule,
+    WhatsappModule
   ],
   controllers: [AppController],
   providers: [

@@ -29,8 +29,8 @@ export class OrdersController {
   }
 
   @Get('/:storeSlug/get-order/:id')
-  async getOrder(@CurrentUser() user: any, @Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
-    return await this.ordersService.getOrderById(user?.id, orderId, storeSlug);
+  async getOrder(@Param('id') orderId: string, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<OrderDto>> {
+    return await this.ordersService.getOrderById(orderId, storeSlug);
   }
 
   @Delete('/:storeSlug/cancel-order/:idUser/:id')

@@ -109,4 +109,8 @@ export class Order {
 
   @Column({ name: 'cancelled_at', type: 'timestamp', nullable: true })
   cancelledAt?: Date;
+
+  getLocation(): string {
+    return `${this.shippingAddress?.city}, ${this.shippingAddress?.neighborhood}`;
+  }
 }
