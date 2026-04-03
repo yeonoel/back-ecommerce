@@ -20,8 +20,8 @@ async function bootstrap() {
   app.enableCors({
     // TODO: On va le restreindre après le premier déploiement
     origin: [
-      "https://kernelhub-store.vercel.app/",
-      "https://kernelswip-store.vercel.app/",
+      "https://kernelhub-store.vercel.app",
+      "https://kernelswip-store.vercel.app",
       "http://localhost:5173",
       "http://localhost:5174",
       "https://www.kernelsshop.com",
