@@ -392,7 +392,7 @@ export class OrdersService {
    * @param orderId l'ID de la commande
    * @return Promise<OrderDto>
    */
-  async getOrderById(userId: string, orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
+  async getOrderById(orderId: string, storeSlug: string): Promise<ResponseDto<OrderDto>> {
     const order = await this.ordersRepository.findOne(
       {
         where: { id: orderId, store: { slug: storeSlug } },
@@ -406,6 +406,21 @@ export class OrdersService {
       message: 'Commande obtenue avec success',
       data: mapToOrderDto(order),
     };
+  }
+
+  async confirmeOrder(orderNumber: string, storeSlug: string): Promise<Order> {
+    const order = await this.ordersRepository.findOne(
+      {
+        where: { orderNumber: orderNumber, store: { slug: storeSlug } },
+        relations: ['store', 'shippingAddress']
+      });
+    if (!order) {
+      throw new NotFoundException('Commande introuvable');
+    }
+    order.status = OrderStatus.CONFIRMED_BY_CLIENT;
+    order.updatedAt = new Date();
+
+    return await this.ordersRepository.save(order);
   }
 
   /**

@@ -19,7 +19,12 @@ async function bootstrap() {
 
   app.enableCors({
     // TODO: On va le restreindre après le premier déploiement
-    origin: '*',
+    origin: [
+      "https://kernelhub-store.vercel.app/",
+      "https://kernelswip-store.vercel.app/",
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
     credentials: true,
     methods: 'GET,PUT,POST,DELETE, PATCH',
   });
@@ -37,7 +42,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new TypeOrmExceptionFilter());
-  app.setGlobalPrefix('api/');
+  app.setGlobalPrefix('api');
   // Pour lagestion des erreurs
   app.useGlobalFilters(new HttpExceptionFilter()); // 👈
 
@@ -56,7 +61,7 @@ async function bootstrap() {
     console.log(` Swagger disponible sur http://localhost:${port}/api/docs`);
   }
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`API listening on http://localhost:${port}/api`);
 }
 bootstrap();
