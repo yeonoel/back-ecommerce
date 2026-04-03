@@ -191,6 +191,33 @@ export class StoresService {
     });
   }
 
+  async getStoreBySlug(slug: string): Promise<StoreResponseDto> {
+    const store = await this.storeRepository.findOne({
+      where: { slug, isDeleted: false },
+      relations: ['owner'],
+    });
+    if (!store) throw new NotFoundException('Boutique introuvable');
+
+    const storeUrl = `${process.env.STOREFRONT_URL}/${store.slug}`;
+    return {
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      description: store.description,
+      logoUrl: store.logoUrl,
+      whatsappNumber: store.whatsappNumber,
+      status: store.status,
+      storeUrl,
+      createdAt: store.createdAt,
+      updatedAt: store.updatedAt,
+      owner: {
+        id: store.owner.id,
+        firstName: store.owner.firstName,
+        phone: store.owner.phone,
+        role: store.owner.role
+      },
+    };
+  }
 
   /**
    * Get the store of a user by its ID

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, Req, Session, UseInterceptors, UploadedFiles, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode, HttpStatus, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { StoresService } from './stores.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -20,6 +20,13 @@ export class StoresController {
   @HttpCode(HttpStatus.CREATED)
   async createStore(@Body() dto: CreateStoreDto, @UploadedFile() logo?: Express.Multer.File) {
     return await this.storesService.createStore(dto, logo);
+  }
+
+  @Get(':slug')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async getStoreBySlug(@Param('slug') slug: string) {
+    return await this.storesService.getStoreBySlug(slug);
   }
 
   @Get('me')
@@ -49,7 +56,7 @@ export class StoresController {
 
   @Delete(':slugStore')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SELLER)
   @HttpCode(HttpStatus.CREATED)
   async deleteStore(@Param('slugStore') slugStore: string) {
     return await this.storesService.deleteStore(slugStore);
