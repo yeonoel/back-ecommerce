@@ -7,7 +7,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/users/enum/userRole.enum';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { UpdateStoreDto } from './dto/update-store.dto';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Public } from '../common/decorators/public.decorator';
 
 @Controller('stores')
