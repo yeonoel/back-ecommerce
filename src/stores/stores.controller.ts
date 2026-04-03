@@ -22,7 +22,7 @@ export class StoresController {
     return await this.storesService.createStore(dto, logo);
   }
 
-  @Get(':slug')
+  @Get('/store/:slug')
   @Public()
   @HttpCode(HttpStatus.OK)
   async getStoreBySlug(@Param('slug') slug: string) {
