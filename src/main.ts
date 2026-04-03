@@ -24,6 +24,8 @@ async function bootstrap() {
       "https://kernelswip-store.vercel.app/",
       "http://localhost:5173",
       "http://localhost:5174",
+      "https://www.kernelsshop.com/",
+      "https://www.kernelaap.com/",
     ],
     credentials: true,
     methods: 'GET,PUT,POST,DELETE, PATCH',
