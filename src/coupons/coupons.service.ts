@@ -4,14 +4,14 @@ import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Coupon } from './entities/coupon.entity';
 import { Repository } from 'typeorm';
-import { CouponUsage } from 'src/coupon-usage/entities/coupon-usage.entity';
+import { CouponUsage } from '../coupon-usage/entities/coupon-usage.entity';
 import { DiscountType } from './enums/discount-type.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { ValidateCouponResponseDto } from './dto/responses/validate-coupon-response.dto';
-import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
+import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { CouponFilterDto } from './dto/coupon-filter.dto';
-import { CalculationHelper } from 'src/common/helpers/calculation.helper';
-import { Store } from 'src/stores/entities/store.entity';
+import { CalculationHelper } from '../common/helpers/calculation.helper';
+import { Store } from '../stores/entities/store.entity';
 
 @Injectable()
 export class CouponsService {

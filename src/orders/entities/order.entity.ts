@@ -37,7 +37,7 @@ export class Order {
   @OneToMany(() => OrderItem, orderItem => orderItem.order)
   items: OrderItem[];
 
-  @Column({ default: OrderStatus.PENDING_CONFIRMATION, type: 'enum', enum: OrderStatus })
+  @Column({ default: OrderStatus.CONFIRMED_BY_CLIENT, type: 'enum', enum: OrderStatus })
   status: OrderStatus;
 
   @Column({ name: 'payment_status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING_PAYMENT })

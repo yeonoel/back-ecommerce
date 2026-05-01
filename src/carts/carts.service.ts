@@ -4,7 +4,7 @@ import { Cart } from './entities/cart.entity';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { CartItem } from '../cart-items/entities/cart-item.entity';
 import { Product } from '../products/entities/product.entity';
-import { ProductVariant } from 'src/product-variants/entities/product-variant.entity';
+import { ProductVariant } from '../product-variants/entities/product-variant.entity';
 import { Coupon } from '../coupons/entities/coupon.entity';
 import { CartDto } from './dto/responses/cart-dto';
 import { CreateOrAddToCartDto } from './dto/create-or-add-cart.dto';
@@ -14,8 +14,8 @@ import { CalculationHelper } from '../common/helpers/calculation.helper';
 import { CouponsService } from '../coupons/coupons.service';
 import { ValidateCouponResponseDto } from '../coupons/dto/responses/validate-coupon-response.dto';
 import { Store } from '../stores/entities/store.entity';
-import { User } from 'src/users/entities/user.entity';
-import { UserRole } from 'src/users/enum/userRole.enum';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enum/userRole.enum';
 
 @Injectable()
 export class CartsService {

@@ -2,12 +2,12 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Payment } from './entities/payment.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Order } from 'src/orders/entities/order.entity';
+import { Order } from '../orders/entities/order.entity';
 import Stripe from 'stripe';
 import { PaymentStatus } from './enums/payment-status.enum';
 import { PaymentMethodType } from './enums/payment-method-type.enum';
 import { currencyTypes } from '../common/enums/currency-type.enum';
-import { ResponseDto } from 'src/common/dto/responses/Response.dto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { PaymentResponseDto } from './dto/responses/payment-response.dto';
 import { ConfigService } from '@nestjs/config';
 

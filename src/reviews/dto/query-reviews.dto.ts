@@ -1,8 +1,8 @@
 import { Type } from "class-transformer";
 import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
 import { PaginationDto } from "../../common/dto/pagination.dto";
-import { SortOrder } from "src/common/enums/sort-order.enum";
-import { ReviewSortBy } from "src/common/enums/review-sort-by.enum";
+import { SortOrder } from "../../common/enums/sort-order.enum";
+import { ReviewSortBy } from "../../common/enums/review-sort-by.enum";
 
 export class QueryReviewsDto extends PaginationDto {
   @IsOptional()

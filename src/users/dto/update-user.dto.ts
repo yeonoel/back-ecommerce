@@ -1,4 +1,4 @@
-// src/users/dto/update-profile.dto.ts
+// ../users/dto/update-profile.dto.ts
 import { IsOptional, IsString, IsEmail, IsPhoneNumber, MaxLength } from 'class-validator';
 
 export class UpdateUserDto {

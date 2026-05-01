@@ -1,8 +1,8 @@
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
 import { PaymentMethodType } from '../../payments/enums/payment-method-type.enum';
-import { CreateAddressDto } from 'src/addresses/dto/create-address.dto';
+import { CreateAddressDto } from '../../addresses/dto/create-address.dto';
 import { Type } from 'class-transformer';
-import { CreateOrderItemDto } from 'src/order-items/dto/create-order-item.dto';
+import { CreateOrderItemDto } from '../../order-items/dto/create-order-item.dto';
 export class CreateOrderDto {
   @ValidateNested()
   @Type(() => CreateAddressDto)

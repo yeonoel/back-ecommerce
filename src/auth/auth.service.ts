@@ -8,9 +8,9 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthResponseDto } from './dto/Users-response';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
-import { CartsService } from 'src/carts/carts.service';
-import { Store } from 'src/stores/entities/store.entity';
-import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
+import { CartsService } from '../carts/carts.service';
+import { Store } from '../stores/entities/store.entity';
+import { ShopCustomer } from '../shop-customer/entities/shop-customer.entity';
 
 @Injectable()
 export class AuthService {

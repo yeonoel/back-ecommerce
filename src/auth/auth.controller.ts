@@ -6,7 +6,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Public } from '../common/decorators/public.decorator';
 import { SessionId } from '../common/decorators/session.decorator';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { CurrentUser } from '../common/decorators/user.decorator';
 
 @ApiTags('auth')
 @Public()

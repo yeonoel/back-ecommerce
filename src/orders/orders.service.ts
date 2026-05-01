@@ -15,17 +15,15 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { OrderStatus } from './enums/order-status.enum';
-import { PaymentStatus } from 'src/payments/enums/payment-status.enum';
+import { PaymentStatus } from '../payments/enums/payment-status.enum';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
-import { Store } from 'src/stores/entities/store.entity';
-import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from 'src/common/helpers/buildWhatssapLink';
-import { User } from 'src/users/entities/user.entity';
-import { UserRole } from 'src/users/enum/userRole.enum';
-import { ShopCustomer } from 'src/shop-customer/entities/shop-customer.entity';
-import { CartItem } from 'src/cart-items/entities/cart-item.entity';
-import { Coupon } from 'src/coupons/entities/coupon.entity';
-import { CouponUsage } from 'src/coupon-usage/entities/coupon-usage.entity';
-import { CreateOrderItemDto } from 'src/order-items/dto/create-order-item.dto';
+import { Store } from '../stores/entities/store.entity';
+import { getWhatsAppRedirectUrl, notifyClientByWhatsApp } from '../common/helpers/buildWhatssapLink';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enum/userRole.enum';
+import { ShopCustomer } from '../shop-customer/entities/shop-customer.entity';
+import { CartItem } from '../cart-items/entities/cart-item.entity';
+import { CreateOrderItemDto } from '../order-items/dto/create-order-item.dto';
 import { ResolvedOrderItem } from './type/ResolvedOrderItem';
 
 @Injectable()
@@ -80,7 +78,7 @@ export class OrdersService {
 
       const userId = user.id;
 
-      // ✅ Résolution des items : panier OU commande directe
+      //  Résolution des items : panier OU commande directe
       let orderItems: ResolvedOrderItem[];
       let subtotal: number;
       let tax: number;
@@ -150,11 +148,12 @@ export class OrdersService {
         shippingAddressSnapshot: shippingSnapshot,
         billingAddressSnapshot: billingSnapshot,
         customerNote: createOrderDto.customerNote,
+        status: OrderStatus.CONFIRMED_BY_CLIENT,
         paymentMethod: createOrderDto.paymentMethod,
         expiresAt,
       });
 
-      // ✅ Création des OrderItems (commun aux deux cas)
+      // Création des OrderItems (commun aux deux cas)
       for (const item of orderItems) {
         await manager.save(OrderItem, {
           order: { id: order.id },
@@ -273,8 +272,6 @@ export class OrdersService {
         order.cancelledAt = new Date();
         // Restaurer le stock
         await this.restoreStock(order.items, manager);
-      } else if (newStatus === OrderStatus.APPROVED_BY_SELLER) {
-        order.approvedAt = new Date();
       }
 
       await manager.save(Order, order);
@@ -436,12 +433,6 @@ export class OrdersService {
       if (!order) {
         throw new NotFoundException('Commande introuvable');
       }
-      // Vérifier que la commande peut être annulée
-      if (![OrderStatus.PENDING_CONFIRMATION].includes(order.status)) {
-        throw new BadRequestException(
-          `La commande ne peut pas etre annulée. Statut: ${order.status}`,
-        );
-      }
       // Mettre le statut à cancelled
       order.status = OrderStatus.CANCELLED;
       order.cancelledAt = new Date();
@@ -576,9 +567,8 @@ export class OrdersService {
    */
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): void {
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending_confirmation: [OrderStatus.CONFIRMED_BY_CLIENT, OrderStatus.CANCELLED],
-      confirmed_by_client: [OrderStatus.APPROVED_BY_SELLER, OrderStatus.CANCELLED],
-      approved_by_seller: [OrderStatus.DELIVERED],
+      pending_confirmation: [OrderStatus.CONFIRMED_BY_CLIENT],
+      confirmed_by_client: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
       delivered: [],
       cancelled: [],
     };
@@ -598,7 +588,6 @@ export class OrdersService {
     const statusMap: { [key: string]: string } = {
       pending_confirmation: OrderStatus.PENDING_CONFIRMATION,
       confirmed_by_client: OrderStatus.CONFIRMED_BY_CLIENT,
-      approved_by_seller: OrderStatus.APPROVED_BY_SELLER,
       delivered: OrderStatus.DELIVERED,
       cancelled: OrderStatus.CANCELLED,
     };

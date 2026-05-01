@@ -1,4 +1,4 @@
-import { User } from "src/users/entities/user.entity"
+import { User } from "../../users/entities/user.entity"
 import { UserDataDto } from "../dto/Users-response"
 
 export const mapToUserDto = (user: User): UserDataDto => {

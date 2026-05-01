@@ -2,10 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode,
 import { CreateStoreDto } from './dto/create-store.dto';
 import { StoresService } from './stores.service';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/common/guards/roles.gaurds';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { UserRole } from 'src/users/enum/userRole.enum';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { RolesGuard } from '../common/guards/roles.gaurds';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../users/enum/userRole.enum';
+import { CurrentUser } from '../common/decorators/user.decorator';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Public } from '../common/decorators/public.decorator';

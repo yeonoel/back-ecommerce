@@ -1,4 +1,4 @@
-import { CartItem } from "src/cart-items/entities/cart-item.entity";
+import { CartItem } from "../../cart-items/entities/cart-item.entity";
 import { BusinessConstants } from "../constants/businness.constant";
 
 /**
@@ -16,7 +16,7 @@ export class CalculationHelper {
   /**
    * Calculer un pourcentage
    */
-  static calculatePercentage(amount: number,percentage: number): number {
+  static calculatePercentage(amount: number, percentage: number): number {
     return this.roundToTwoDecimals((amount * percentage) / 100);
   }
 
@@ -32,7 +32,7 @@ export class CalculationHelper {
   }
 
   static calculateSubtotal(items: CartItem[]): number {
-    return items.reduce((sum, item) => sum + item.price * item.quantity,0);
+    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
   static calculateTax(subtotal: number, RATE: number): number {
@@ -40,8 +40,8 @@ export class CalculationHelper {
   }
 
   static calculateShipping(subtotal: number): number {
-    return subtotal >= BusinessConstants.SHIPPING.FREE_SHIPPING_THRESHOLD ? 
-    0 : BusinessConstants.SHIPPING.STANDARD_COST;
+    return subtotal >= BusinessConstants.SHIPPING.FREE_SHIPPING_THRESHOLD ?
+      0 : BusinessConstants.SHIPPING.STANDARD_COST;
   }
 
   static calculateCartTotal(subtotal: number, tax: number, shippingCost: number, discountAmount: number): number {

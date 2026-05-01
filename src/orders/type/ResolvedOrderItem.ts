@@ -1,5 +1,5 @@
-import { ProductVariant } from "src/product-variants/entities/product-variant.entity";
-import { Product } from "src/products/entities/product.entity";
+import { ProductVariant } from "../../product-variants/entities/product-variant.entity";
+import { Product } from "../../products/entities/product.entity";
 
 export interface ResolvedOrderItem {
     product: Product;

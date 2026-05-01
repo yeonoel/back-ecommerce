@@ -58,7 +58,7 @@ JWT_SECRET=your_secret_key
 
 ```bash
 backend/
-├─ src/
+├─ ../
 │  ├─ main.ts
 │  ├─ app.module.ts
 │  ├─ app.controller.ts

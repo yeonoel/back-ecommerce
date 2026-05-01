@@ -1,8 +1,8 @@
 import { Controller, Post, Req, Headers } from '@nestjs/common';
-import { OrdersService } from 'src/orders/orders.service';
-import { PaymentsService } from 'src/payments/payments.service';
+import { OrdersService } from '../orders/orders.service';
+import { PaymentsService } from '../payments/payments.service';
 import type { RequestWithRawBody } from './interface/request-with-raw-body';
-import { Public } from 'src/common/decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller('webhooks')
 export class WebhooksController {

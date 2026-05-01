@@ -5,11 +5,11 @@ import { DataSource, EntityManager, Not } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { ResponseDto } from '../common/dto/responses/Response.dto';
-import { generateSku } from 'src/common/utils/sku.util';
-import { OrderItem } from 'src/order-items/entities/order-item.entity';
+import { generateSku } from '../common/utils/sku.util';
+import { OrderItem } from '../order-items/entities/order-item.entity';
 import { not } from 'rxjs/internal/util/not';
-import { OrderStatus } from 'src/orders/enums/order-status.enum';
-import { Store } from 'src/stores/entities/store.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { Store } from '../stores/entities/store.entity';
 
 @Injectable()
 export class ProductVariantsService {

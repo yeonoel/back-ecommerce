@@ -6,16 +6,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Category } from './entities/category.entity';
 import slugify from 'slugify';
 import { ResponseDto } from '../common/dto/responses/Response.dto';
-import { generateSlug } from 'src/common/utils/slug.util';
+import { generateSlug } from '../common/utils/slug.util';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>
-  ) {}
+  ) { }
   async createCategory(createCategoryDto: CreateCategoryDto): Promise<ResponseDto> {
-    const {name} = createCategoryDto;
+    const { name } = createCategoryDto;
     const slug = generateSlug(name);
     const existing = await this.categoriesRepository.findOne({ where: { slug } });
     if (existing) {
@@ -35,7 +35,7 @@ export class CategoriesService {
 
   findAllCategories(): Promise<Category[]> {
     return this.categoriesRepository.find(
-      {where: {isActive: true}, order: {displayOrder: 'ASC'}}
+      { where: { isActive: true }, order: { displayOrder: 'ASC' } }
     );
   }
 
@@ -54,13 +54,13 @@ export class CategoriesService {
     }
     let slug = category.slug;
     if (updateCategoryDto.name && updateCategoryDto.name !== category.name) {
-      slug = slugify(updateCategoryDto.name, {lower: true});
+      slug = slugify(updateCategoryDto.name, { lower: true });
       const existing = await this.categoriesRepository.findOne({ where: { slug } });
       if (existing && existing.id !== id) {
         throw new ConflictException(`slug already exists`);
       }
     }
-    await this.categoriesRepository.update(id, {...updateCategoryDto, slug });
+    await this.categoriesRepository.update(id, { ...updateCategoryDto, slug });
     const updatedCategory = await this.categoriesRepository.findOne({ where: { id } });
     return {
       success: true,
@@ -69,7 +69,7 @@ export class CategoriesService {
     };
   }
 
-  async removeCategory(id: string, ): Promise<ResponseDto> {
+  async removeCategory(id: string,): Promise<ResponseDto> {
     const category = await this.categoriesRepository.findOne({ where: { id } });
     if (!category) {
       throw new NotFoundException('Category not found');

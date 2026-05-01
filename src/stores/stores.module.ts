@@ -2,12 +2,12 @@ import { forwardRef, Module } from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { StoresController } from './stores.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from 'src/users/entities/user.entity';
-import { ShopInvitation } from 'src/shop-invitation/entities/shop-invitation.entity';
+import { User } from '../users/entities/user.entity';
+import { ShopInvitation } from '../shop-invitation/entities/shop-invitation.entity';
 import { Store } from './entities/store.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { UploadModule } from 'src/upload/upload.module';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [

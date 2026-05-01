@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
-import { Public } from 'src/common/decorators/public.decorator';
-import { OrdersService } from 'src/orders/orders.service';
+import { Public } from '../common/decorators/public.decorator';
+import { OrdersService } from '../orders/orders.service';
 
 @Controller('webhook-whatsapp')
 export class WhatsappController {

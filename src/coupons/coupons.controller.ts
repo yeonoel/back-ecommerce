@@ -8,7 +8,7 @@ import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Coupon } from './entities/coupon.entity';
 import { CouponFilterDto } from './dto/coupon-filter.dto';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { CurrentUser } from '../common/decorators/user.decorator';
 
 @Controller('dashboard/:storeSlug/coupons')
 @UseGuards(JwtAuthGuard)

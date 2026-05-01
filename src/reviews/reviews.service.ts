@@ -10,13 +10,13 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 import { QueryReviewsDto } from './dto/query-reviews.dto';
 import { ReviewResponseDto } from './dto/responses/review-response.dto';
 import { ProductReviewsResponseDto } from './dto/responses/product-reviews-response.dto';
-import { OrderStatus } from 'src/orders/enums/order-status.enum';
+import { OrderStatus } from '../orders/enums/order-status.enum';
 import { PurchaseVerificationResult } from './interface/purchase-verification-resultat';
-import { SortOrder } from 'src/common/enums/sort-order.enum';
-import { ResponseDto } from 'src/common/dto/responses/Response.dto';
+import { SortOrder } from '../common/enums/sort-order.enum';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { UpdateApproveStatusDto } from './dto/update-approve-status.dto';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 
 @Injectable()
 export class ReviewsService {

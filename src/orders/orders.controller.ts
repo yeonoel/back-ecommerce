@@ -1,20 +1,20 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpStatus, HttpCode, Session } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UseGuards } from '@nestjs/common/decorators/core/use-guards.decorator';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { ResponseDto } from 'src/common/dto/responses/Response.dto';
+import { ResponseDto } from '../common/dto/responses/Response.dto';
 import { OrderDto } from './dto/response/order-dto';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesGuard } from 'src/common/guards/roles.gaurds';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { PaginatedResponseDto } from 'src/common/dto/responses/paginated-response.dto';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.gaurds';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/responses/paginated-response.dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrderFilterParams } from './dto/order-filter-params.dto';
-import { SessionId } from 'src/common/decorators/session.decorator';
-import { Public } from 'src/common/decorators/public.decorator';
+import { SessionId } from '../common/decorators/session.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -67,7 +67,14 @@ export class OrdersController {
   @UseGuards(RolesGuard, JwtAuthGuard)
   @Roles('seller')
   async getAllOrders(@Query() orderFilterParams: OrderFilterParams, @Param('storeSlug') storeSlug: string): Promise<ResponseDto<PaginatedResponseDto<OrderDto>>> {
-    return await this.ordersService.getAllOrders(orderFilterParams, storeSlug);
+    const items = await this.ordersService.getAllOrders(orderFilterParams, storeSlug);
+    console.log("==========================================");
+    console.log("==========================================");
+    console.log("==========================================");
+    console.log("==========================================");
+
+    console.log('Received request for all orders with filters:', orderFilterParams);
+    return items;
   }
 
   /** *********************************TODO: A supprimer dans la version finale************************************ */

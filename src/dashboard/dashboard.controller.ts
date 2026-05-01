@@ -1,10 +1,10 @@
 
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
-import { RolesGuard } from 'src/common/guards/roles.gaurds';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { RolesGuard } from '../common/guards/roles.gaurds';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/user.decorator';
 
 @Controller('dashboard/:slugStore/')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,7 +21,8 @@ export class DashboardController {
 
   @Get('products/stats')
   @Roles('seller')
-  getProductsStats(@CurrentUser() user: any, @Param('slugStore') slugStore: string) {
-    return this.dashboardService.getProductsStats(slugStore, user.id);
+  async getProductsStats(@CurrentUser() user: any, @Param('slugStore') slugStore: string) {
+    const stats = await this.dashboardService.getProductsStats(slugStore, user.id);
+    return stats;
   }
 }

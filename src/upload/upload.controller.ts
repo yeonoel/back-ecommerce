@@ -1,6 +1,6 @@
-// src/upload/upload.controller.ts
+// ../upload/upload.controller.ts
 
-import {Controller, Post, UseInterceptors, UploadedFile, UploadedFiles, UseGuards, BadRequestException} from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, UploadedFiles, UseGuards, BadRequestException } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -11,7 +11,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(private readonly uploadService: UploadService) { }
 
   @Post('image')
   @UseInterceptors(FileInterceptor('file'))

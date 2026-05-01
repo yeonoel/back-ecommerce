@@ -1,4 +1,4 @@
-import { mapToOrderItemDto } from "src/order-items/mapper/map-To-OrderItem.dto";
+import { mapToOrderItemDto } from "../../order-items/mapper/map-To-OrderItem.dto";
 import { OrderDto } from "../dto/response/order-dto";
 import { Order } from "../entities/order.entity";
 

@@ -1,29 +1,29 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import configuration from '../src/config/configuration';
+import configuration from '../../config/configuration';
 import { testDbConfig } from './test-db.config';
-import { CategoriesModule } from '../src/categories/categories.module';
-import { ProductsModule } from '../src/products/products.module';
-import { AuthModule } from '../src/auth/auth.module';
-import { ProductVariantsModule } from '../src/product-variants/product-variants.module';
-import { CartsModule } from '../src/carts/carts.module';
-import { OrdersModule } from '../src/orders/orders.module';
-import { OrderItemsModule } from '../src/order-items/order-items.module';
-import { PaymentsModule } from '../src/payments/payments.module';
-import { ReviewsModule } from '../src/reviews/reviews.module';
-import { CouponsModule } from '../src/coupons/coupons.module';
-import { WishlistsModule } from '../src/wishlists/wishlists.module';
-import { NotificationsModule } from '../src/notifications/notifications.module';
-import { AppController } from '../src/app.controller';
-import { AppService } from '../src/app.service';
+import { CategoriesModule } from '../../categories/categories.module';
+import { ProductsModule } from '../../products/products.module';
+import { AuthModule } from '../../auth/auth.module';
+import { ProductVariantsModule } from '../../product-variants/product-variants.module';
+import { CartsModule } from '../../carts/carts.module';
+import { OrdersModule } from '../../orders/orders.module';
+import { OrderItemsModule } from '../../order-items/order-items.module';
+import { PaymentsModule } from '../../payments/payments.module';
+import { ReviewsModule } from '../../reviews/reviews.module';
+import { CouponsModule } from '../../coupons/coupons.module';
+import { WishlistsModule } from '../../wishlists/wishlists.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
+import { AppController } from '../../app.controller';
+import { AppService } from '../../app.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env.test',
-      load: [ configuration ],
+      load: [configuration],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -45,9 +45,9 @@ import { AppService } from '../src/app.service';
     CouponsModule,
     WishlistsModule,
     NotificationsModule,
-    
+
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class TestAppModule {}
+export class TestAppModule { }

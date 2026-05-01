@@ -1,13 +1,17 @@
 export class ProductStatsDto {
   totalProducts: number;
-  inventoryValue: number;   
+  inventoryValue: number;
   lowStockCount: number;
   outOfStockCount: number;
+  countOrders: number;
+  orderDelivered: number;
+  totalRevenue: number;
+  clientsNumber: number;
 
   // Détails pour alertes
   lowStockProducts: LowStockProductsForProducstStats[];
   outOfStockProducts: OutOfStockProductDto[];
-  
+
   // Stats supplémentaires (optionnel)
   activeProducts: number;
   inactiveProducts: number;

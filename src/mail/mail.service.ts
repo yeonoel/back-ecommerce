@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import { ShipmentStatus } from 'src/shipments/enums/shipment-status';
+import { ShipmentStatus } from '../shipments/enums/shipment-status';
 
 @Injectable()
 export class MailService {

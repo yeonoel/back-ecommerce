@@ -1,5 +1,5 @@
-import { Order } from "src/orders/entities/order.entity";
-import { Store } from "src/stores/entities/store.entity";
+import { Order } from "../../orders/entities/order.entity";
+import { Store } from "../../stores/entities/store.entity";
 
 /**
  * Génère le lien WhatsApp avec le message pré-rempli

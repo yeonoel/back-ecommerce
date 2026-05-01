@@ -4,7 +4,7 @@ import { CouponsController } from './coupons.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Coupon } from './entities/coupon.entity';
 import { CouponUsage } from '../coupon-usage/entities/coupon-usage.entity';
-import { Store } from 'src/stores/entities/store.entity';
+import { Store } from '../stores/entities/store.entity';
 
 @Module({
   imports: [

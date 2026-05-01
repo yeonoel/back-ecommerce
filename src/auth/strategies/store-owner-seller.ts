@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, } from '@nestjs/common';
-import { UserRole } from 'src/users/enum/userRole.enum';
+import { UserRole } from '../../users/enum/userRole.enum';
 /**
  * Guard à utiliser sur les routes du dashboard vendeur.
  * Vérifie que le seller connecté accède bien à SA boutique

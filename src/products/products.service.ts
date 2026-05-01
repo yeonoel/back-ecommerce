@@ -15,8 +15,8 @@ import { UploadService } from '../upload/upload.service';
 import { OrderItem } from '../order-items/entities/order-item.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { nanoid } from 'nanoid/non-secure';
-import { Store } from 'src/stores/entities/store.entity';
-import { createSharingLinkOnSocialMedia } from 'src/common/helpers/buildWhatssapLink';
+import { Store } from '../stores/entities/store.entity';
+import { createSharingLinkOnSocialMedia } from '../common/helpers/buildWhatssapLink';
 
 @Injectable()
 export class ProductsService {

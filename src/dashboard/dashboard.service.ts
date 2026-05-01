@@ -14,6 +14,8 @@ import { ProductVariant } from '../product-variants/entities/product-variant.ent
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { calculateChange } from '../helper/calculChange';
 import { Store } from '../stores/entities/store.entity';
+import { parse } from 'path';
+import { start } from 'repl';
 
 @Injectable()
 export class DashboardService {
@@ -121,8 +123,7 @@ export class DashboardService {
     // Commandes en attente de livraison
     const pendingDeliveries = await this.orderRepository.count({
       where: [
-        { status: OrderStatus.APPROVED_BY_SELLER },
-        { status: OrderStatus.APPROVED_BY_SELLER },
+        { status: OrderStatus.CONFIRMED_BY_CLIENT },
       ]
     });
 
@@ -139,8 +140,8 @@ export class DashboardService {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     const [totalRevenue, lastMonthRevenue] = await Promise.all([
-      this.calculateTotalRevenue(),
-      this.calculateTotalRevenue(startOfLastMonth, endOfLastMonth),
+      this.totalRevenue(slugStore),
+      this.totalRevenue(slugStore, startOfLastMonth, endOfLastMonth),
     ]);
 
     return {
@@ -158,7 +159,7 @@ export class DashboardService {
  * @returns 
  */
   async getProductsStats(slugStore: string, userId: string): Promise<ProductStatsDto> {
-    const store = this.storeRepository.findOne({ where: { slug: slugStore, owner: { id: userId } } });
+    const store = await this.storeRepository.findOne({ where: { slug: slugStore, owner: { id: userId } } });
     if (!store) {
       throw new NotFoundException('Boutique introuvable');
     }
@@ -174,6 +175,10 @@ export class DashboardService {
       inactiveProducts,
       featuredProducts,
       totalVariants,
+      countOrders,
+      orderDelivered,
+      totalRevenue,
+      clientsNumber,
     ] = await Promise.all([
       this.countTotalProducts(),
       this.calculateInventoryValue(),
@@ -185,6 +190,10 @@ export class DashboardService {
       this.countInactiveProducts(),
       this.countFeaturedProducts(),
       this.countTotalVariants(),
+      this.countOrders(slugStore),
+      this.orderDelivered(slugStore),
+      this.totalRevenue(slugStore),
+      this.countClients(slugStore),
     ]);
 
     return {
@@ -198,26 +207,88 @@ export class DashboardService {
       inactiveProducts,
       featuredProducts,
       totalVariants,
+      countOrders,
+      orderDelivered,
+      totalRevenue,
+      clientsNumber
     };
+  }
+
+  private async orderDelivered(slugStore: string, startDate?: Date, endDate?: Date): Promise<number> {
+    const query = await this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoin('order.store', 'store')
+      .select('COUNT(DISTINCT order.id)', 'count')
+      .where('store.slug = :slugStore', { slugStore })
+      .andWhere('order.status = :status', { status: OrderStatus.DELIVERED });
+
+    if (startDate && endDate) {
+      query.andWhere('order.deliveredAt BETWEEN :startDate AND :endDate', { startDate, endDate });
+    }
+    const result = await query.getRawOne();
+    return parseInt(result?.count || '0', 10);
+  }
+
+  private async countClients(slugStore: string): Promise<number> {
+    const result = await this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoin('order.store', 'store')
+      .leftJoin('order.user', 'user')
+      .where('store.slug = :slugStore', { slugStore })
+      .andWhere('user.role = :role', { role: UserRole.CUSTOMER })
+      .andWhere('user.isActive = :isActive', { isActive: true })
+      .select('COUNT(DISTINCT user.id)', 'count')
+      .getRawOne();
+
+    return parseInt(result?.count || '0', 10);
   }
 
   /**
    * Calcul du revenu total
    * @param startDate 
    * @param endDate 
+   * @param slugStore
    * @returns 
    */
-  private async calculateTotalRevenue(startDate?: Date, endDate?: Date): Promise<number> {
+  private async totalRevenue(slugStore: string, startDate?: Date, endDate?: Date): Promise<number> {
     const query = this.orderRepository
       .createQueryBuilder('order')
+      .leftJoin('order.store', 'store')
       .select('SUM(order.total)', 'total')
-      .where('order.paymentStatus = :status', { status: PaymentStatus.PAID });
+      .where('order.status = :status', { status: OrderStatus.DELIVERED })
+      .andWhere('store.slug = :slugStore', { slugStore });
+
     if (startDate && endDate) {
-      query.andWhere('order.paidAt BETWEEN :startDate AND :endDate', { startDate, endDate });
+      query.andWhere('order.deliveredAt BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
+
     const result = await query.getRawOne();
-    return parseFloat(result?.total || 0);
+    console.log('totalRevenue raw:', result);
+    return parseFloat(result?.total || '0');
   }
+
+  /**
+   * Compte le nombre de commande
+   * @param startDate 
+   * @param endDate 
+   * @returns 
+   */
+  private async countOrders(slugStore: string, startDate?: Date, endDate?: Date): Promise<number> {
+    const query = this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoin('order.store', 'store')
+      .where('store.slug = :slugStore', { slugStore })
+      .andWhere('order.status = :status', { status: OrderStatus.CONFIRMED_BY_CLIENT });
+
+    if (startDate && endDate) {
+      query.andWhere('order.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate });
+    }
+
+    const result = await query.getCount();
+
+    return parseFloat(result?.toString() || '0');
+  }
+
 
   /**
    * Calcul du revenu par mois
@@ -243,20 +314,6 @@ export class DashboardService {
       orders: parseInt(result.orders, 10),
       label: this.formatMonthLabel(result.month),
     }));
-  }
-
-  /**
-   * Compte le nombre de commande
-   * @param startDate 
-   * @param endDate 
-   * @returns 
-   */
-  private async countOrders(startDate?: Date, endDate?: Date): Promise<number> {
-    const query = this.orderRepository.createQueryBuilder('order');
-    if (startDate && endDate) {
-      query.where('order.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate });
-    }
-    return query.getCount();
   }
 
   /**

@@ -7,25 +7,25 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.gaurds';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UpdateApproveStatusDto } from './dto/update-approve-status.dto';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { CurrentUser } from 'src/common/decorators/user.decorator';
-import { User } from 'src/users/entities/user.entity';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { CurrentUser } from '../common/decorators/user.decorator';
+import { User } from '../users/entities/user.entity';
 
 @Controller('reviews')
 @UseGuards(JwtAuthGuard)
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(private readonly reviewsService: ReviewsService) { }
 
   @Post('products/:productId/reviews')
   @HttpCode(HttpStatus.CREATED)
   async createReview(
-    @Param('productId') productId: string,@Body() createReviewDto: CreateReviewDto,@Req() req: any,) {
+    @Param('productId') productId: string, @Body() createReviewDto: CreateReviewDto, @Req() req: any,) {
     const userId = req.user.id;
     return this.reviewsService.create(productId, userId, createReviewDto);
   }
 
   @Get('products/:productId/reviews')
-  async getProductReviews(@Param('productId') productId: string,@Query() queryDto: QueryReviewsDto,) {
+  async getProductReviews(@Param('productId') productId: string, @Query() queryDto: QueryReviewsDto,) {
     return this.reviewsService.findByProduct(productId, queryDto);
   }
 
@@ -42,7 +42,7 @@ export class ReviewsController {
   }
 
   @Patch('reviews/:id')
-  async updateReview( @Param('id') id: string, @Body() updateReviewDto: UpdateReviewDto, @CurrentUser() user: User) {
+  async updateReview(@Param('id') id: string, @Body() updateReviewDto: UpdateReviewDto, @CurrentUser() user: User) {
     return this.reviewsService.update(id, user?.id, updateReviewDto);
   }
 
